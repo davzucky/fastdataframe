@@ -1,0 +1,128 @@
+---
+description: This rule file provides comprehensive guidelines for using uv, a fast Python package manager, including dependency management, virtual environments, and best practices for project setup and maintenance. It covers code organization, performance, security, testing, and common pitfalls to ensure efficient and reliable Python development.
+globs: **/*.py
+---
+- **Always use UV for Python Dependency Management:** uv is designed as a faster, more efficient replacement for pip and Poetry. Adopt uv for all Python project dependency management.
+
+- **Project Initialization:**
+  - Use `uv init` to initialize new Python projects. This creates `pyproject.toml` and sets up an automatic virtual environment.
+  - Organize code within a `src` directory to promote modularity and prevent import issues. While small projects and notebooks can reside in the root, `src` is best for larger projects.
+  - Include an `__init__.py` in the `src` directory to make it a Python package.
+
+- **Dependency Management with `pyproject.toml` and `uv.lock`:**
+  - Utilize `pyproject.toml` for declaring dependencies and project metadata.
+  - Avoid using `requirements.txt` when possible. Migrate existing projects by using `uv add -r requirements.txt`.
+  - Use `uv add` to add dependencies.
+  - Employ dependency groups for better organization (e.g., `dev`, `test`, `lint`).
+  - Lock dependencies with `uv lock` to ensure reproducible builds.
+  - **Best Practice:** Regularly update dependencies and regenerate the lockfile to keep projects secure and up-to-date: `uv update` followed by `uv lock`.
+
+- **Virtual Environments:**
+  - uv automatically manages virtual environments. Avoid manual activation.
+  - The virtual environment is created in `.venv` folder. Delete and recreate it if necessary.
+  - Use the same Python version throughout the project for consistency.
+  - Create virtual environments per project: `uv venv`
+
+- **Dependency Locking and Reproducibility:**
+  - Always generate and commit `uv.lock` to ensure deterministic builds.
+  - In production, always install from `uv.lock` with `uv sync`.
+
+- **Installing Dependencies:**
+  - Use `uv sync` to install dependencies from `uv.lock`. This ensures the same package versions are installed across environments.
+  - Exclude specific groups with `--no-group` flag: `uv sync --no-group dev --no-group lint`.
+
+- **Python Version Management:**
+  - Install and manage Python versions with `uv python install <version>`. List available Python versions with `uv python list`.
+
+- **Upgrading Packages:**
+  - Use `uv update <package>` to upgrade a specific package.
+  - Regenerate the lockfile after upgrading: `uv lock`.
+
+- **Code Organization and Structure:**
+  - **Directory Structure:** Adopt a consistent directory structure:
+    
+    project_name/
+    ├── pyproject.toml
+    ├── uv.lock
+    ├── README.md
+    ├── src/
+    │   ├── __init__.py
+    │   ├── main.py
+    │   └── ...
+    ├── tests/
+    │   ├── __init__.py
+    │   ├── test_main.py
+    │   └── ...
+    ├── data/
+    ├── docs/
+    └── scripts/
+    
+  - **File Naming:** Use descriptive and consistent file names (e.g., `module_name.py`).
+  - **Module Organization:** Organize code into modules based on functionality.
+  - **Component Architecture:** Follow component-based architecture principles to promote reusability and maintainability.
+  - **Code Splitting:** Break down large modules into smaller, more manageable files.
+
+- **Common Patterns and Anti-patterns:**
+  - **Design Patterns:** Implement design patterns (e.g., Factory, Observer) where appropriate.
+  - **Common Tasks:** Use appropriate libraries for common tasks (e.g., `requests` for HTTP requests, `pandas` for data manipulation).
+  - **Anti-patterns:** Avoid global state, deeply nested code, and excessive complexity.
+  - **State Management:** Use appropriate state management techniques (e.g., classes, data structures) for managing application state.
+  - **Error Handling:** Implement proper error handling using `try...except` blocks.
+
+- **Performance Considerations:**
+  - **Optimization:** Profile code to identify performance bottlenecks and optimize accordingly.
+  - **Memory Management:** Use efficient data structures and algorithms to minimize memory usage.
+  - **Bundle Size:** Minimize dependencies and use code splitting to reduce bundle size.
+  - **Lazy Loading:** Implement lazy loading for modules and resources to improve startup time.
+
+- **Security Best Practices:**
+  - **Vulnerabilities:** Be aware of common vulnerabilities (e.g., injection attacks, cross-site scripting) and take steps to prevent them.
+  - **Input Validation:** Validate all user input to prevent malicious data from entering the system.
+  - **Authentication/Authorization:** Implement proper authentication and authorization mechanisms to protect sensitive data.
+  - **Data Protection:** Use encryption and other security measures to protect data at rest and in transit.
+  - **API Communication:** Use secure protocols (e.g., HTTPS) for API communication.
+
+- **Testing Approaches:**
+  - **Unit Testing:** Write unit tests for individual components and functions.
+  - **Integration Testing:** Test the interaction between different components.
+  - **End-to-End Testing:** Test the entire application flow from start to finish.
+  - **Test Organization:** Organize tests into a separate `tests` directory.
+  - **Mocking/Stubbing:** Use mocking and stubbing techniques to isolate components during testing.
+
+- **Common Pitfalls and Gotchas:**
+  - **Frequent Mistakes:** Avoid common mistakes (e.g., incorrect dependencies, version conflicts).
+  - **Edge Cases:** Be aware of edge cases and handle them appropriately.
+  - **Version Issues:** Be aware of version-specific issues with uv and its dependencies.
+  - **Compatibility:** Ensure compatibility between uv and other technologies used in the project.
+  - **Debugging:** Use debugging tools and techniques to identify and fix issues.
+
+- **Tooling and Environment:**
+  - **Development Tools:** Use recommended development tools (e.g., VS Code, PyCharm).
+  - **Build Configuration:** Configure build settings for optimizing the building process.
+  - **Linting/Formatting:** Use linters (e.g., `ruff`) and formatters (e.g., `black`) to enforce code style.
+  - **Deployment:** Follow deployment best practices to deploy applications in a reliable way.
+  - **CI/CD:** Integrate uv into CI/CD pipelines for automated testing and deployment.
+
+- **Adoption within Projects**
+  - FastAPI has already started using UV within its framework.
+
+- **Migrating from pip**
+  - Uv can generate `requirements.txt` file `uv export --format requirements-txt > requirements.txt`
+
+- **General Recommendations:**
+  - Stick to Python 3.12 or higher for best performance and features.
+  - Always use classes for better code organization and maintainability.
+
+- **UV Commands Cheat Sheet:**
+  - Initialize a project: `uv init`
+  - Add a dependency: `uv add <package>`
+  - Add dependencies to a group: `uv add --group <group_name> <package>`
+  - Remove a dependency: `uv remove <package>`
+  - Install all packages from uv.lock: `uv sync`
+  - Install packages from pyproject.toml without dev dependencies: `uv install --no-group dev`
+  - Upgrade a package: `uv lock --upgrade-package <package>`
+  - View available and installed Python versions: `uv python list`
+  - Install a specific Python version: `uv python install <version>`
+
+- **Final Notes:**
+  - Stay up-to-date with uv's documentation for the latest features and best practices. The official documentation is at: [https://docs.astral.sh/uv/](https://docs.astral.sh/uv/)

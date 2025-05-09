@@ -1,0 +1,118 @@
+---
+description: Provides best practices and coding standards for using the `just` build tool. Covers code organization, common patterns, performance, security, testing, and common pitfalls.
+globs: **/justfile
+---
+---
+## Just Build Tool Best Practices
+
+This document outlines the recommended best practices for using the `just` build tool to ensure maintainable, efficient, and reliable builds.
+
+### 1. Code Organization and Structure
+
+*   **Directory Structure:** Organize your `justfile` alongside your source code or in a dedicated `build` directory at the project root. Consider separating `justfile` into logical components using include directives (`include`) for complex projects.
+
+    
+    project_root/
+    ├── src/
+    │   ├── main.rs
+    │   └── ...
+    ├── build/
+    │   └── justfile  # Or justfile in project_root
+    └── Cargo.toml
+    
+*   **File Naming Conventions:** Use a consistent naming convention. `justfile` is the standard, but `Justfile` or `<project_name>.justfile` may improve clarity in multi-project repositories.  If breaking `justfile` up, be sure to name each `.justfile` such that their intent is clear, like `_database.justfile` or `_frontend.justfile`.
+*   **Module Organization:** Break down your `justfile` into logical modules using `include` directives. Each included file should represent a specific functionality or component of your build process.
+
+    just
+    # justfile
+    include _database.justfile
+    include _frontend.justfile
+    include _backend.justfile
+
+    default: backend frontend
+    
+*   **Component Architecture:** Define clear boundaries between different build components. For example, separate the build process for the frontend, backend, and database components.
+*   **Code Splitting Strategies:** For large projects, split your `justfile` into multiple smaller files based on functionality (e.g., `_build.justfile`, `_test.justfile`, `_deploy.justfile`).  This makes the build logic more modular and easier to understand.
+
+### 2. Common Patterns and Anti-patterns
+
+*   **Design Patterns:**
+    *   **Abstraction:** Use variables and functions to abstract away complex build steps and avoid duplication.
+    *   **Composition:** Combine smaller, reusable recipes to create more complex build processes.
+    *   **Parameterization:**  Use parameters to make recipes more flexible and reusable.
+*   **Recommended Approaches:**
+    *   **Dependency Management:** Use `just` to manage dependencies by defining recipes that download and install necessary tools or libraries.
+    *   **Parallel Builds:** Utilize `just`'s parallel execution capabilities (`--parallel`) to speed up build times.
+    *   **Environment Variables:** Pass configuration options to recipes through environment variables.
+*   **Anti-patterns:**
+    *   **Hardcoding Paths:** Avoid hardcoding absolute paths in your `justfile`. Use relative paths or environment variables instead.
+    *   **Overly Complex Recipes:** Break down complex recipes into smaller, more manageable units.
+    *   **Ignoring Errors:** Always check the exit codes of commands in your recipes and handle errors appropriately.
+    *   **Duplicated Code:** Refactor duplicated commands or logic into reusable functions or variables.
+*   **State Management:**
+    *   Use files to track build state (e.g., timestamps, version numbers) to enable incremental builds.
+    *   Utilize `just`'s variable assignment to store intermediate build results.
+*   **Error Handling:**
+    *   Use the `set -e` command at the beginning of your `justfile` or within recipes to ensure that the build process stops immediately when an error occurs.
+    *   Implement error handling logic in your recipes using conditional statements or shell commands.
+
+### 3. Performance Considerations
+
+*   **Optimization Techniques:**
+    *   **Parallel Execution:** Use the `--parallel` flag to execute recipes in parallel and reduce build times.
+    *   **Caching:** Implement caching mechanisms to avoid re-running recipes that have already been executed with the same inputs.
+    *   **Incremental Builds:**  Use file timestamps or checksums to determine whether a recipe needs to be re-run.
+*   **Memory Management:** Be mindful of memory usage when running commands within `just` recipes. Avoid creating large intermediate files or data structures in memory.
+*   **Bundle Size Optimization:**  If using `just` to manage frontend builds, use tools like `webpack` or `rollup` to optimize bundle sizes by removing unused code and compressing assets.
+*   **Lazy Loading:**  Implement lazy loading strategies to load resources on demand and improve initial load times.
+
+### 4. Security Best Practices
+
+*   **Common Vulnerabilities:**
+    *   **Command Injection:**  Be careful when constructing commands from user-provided input. Always sanitize input to prevent command injection attacks.
+    *   **Path Traversal:**  Avoid constructing file paths from user-provided input without proper validation. This can lead to path traversal vulnerabilities.
+*   **Input Validation:**  Validate all user-provided input before using it in `just` recipes.
+*   **Authentication and Authorization:** If using `just` to manage deployments, ensure that access to deployment infrastructure is properly secured with authentication and authorization mechanisms.
+*   **Data Protection:**  Avoid storing sensitive information (e.g., passwords, API keys) directly in your `justfile`. Use environment variables or a secrets management solution instead.
+*   **Secure API Communication:** If your `justfile` interacts with APIs, use HTTPS to encrypt communication and prevent eavesdropping.
+
+### 5. Testing Approaches
+
+*   **Unit Testing:**  Write unit tests for individual functions and variables in your `justfile` to ensure they behave as expected. Use a testing framework like `bats` or `shunit2` to write and run your tests.
+*   **Integration Testing:**  Write integration tests to verify that different recipes in your `justfile` work together correctly.
+*   **End-to-End Testing:**  Write end-to-end tests to simulate the entire build process and verify that the final output is correct.
+*   **Test Organization:**  Organize your tests in a separate directory (e.g., `test`) and use a consistent naming convention for your test files.
+*   **Mocking and Stubbing:**  Use mocking and stubbing techniques to isolate your tests and avoid dependencies on external resources.
+
+### 6. Common Pitfalls and Gotchas
+
+*   **Frequent Mistakes:**
+    *   **Incorrect Syntax:** `just` has a specific syntax. Ensure you are adhering to it, especially when defining recipes, variables, and functions.
+    *   **Incorrect Shell Interpretation:** Be aware that `just` executes recipes in a shell environment. Use the appropriate shell syntax for your commands.
+*   **Edge Cases:**
+    *   **Special Characters:**  Escape special characters correctly when passing them as arguments to commands.
+    *   **Empty Variables:**  Handle empty variables gracefully in your recipes.
+*   **Version-Specific Issues:**  Be aware of any version-specific issues or bugs in `just`.
+*   **Compatibility Concerns:**  Ensure that your `justfile` is compatible with the target environment (e.g., operating system, shell).
+*   **Debugging Strategies:**
+    *   **Verbose Output:**  Use the `--verbose` flag to print detailed output during the build process.
+    *   **Dry Run:**  Use the `--dry-run` flag to simulate the execution of your `justfile` without actually running any commands.
+    *   **Echo Commands:**  Add `set -x` to the beginning of your recipes to echo each command before it is executed.
+
+### 7. Tooling and Environment
+
+*   **Recommended Development Tools:**
+    *   **Text Editor:** Use a text editor with syntax highlighting for `justfile` (e.g., VS Code with the `just` extension).
+    *   **Shell:** Use a compatible shell (e.g., `bash`, `zsh`) for executing `just` recipes.
+*   **Build Configuration:**
+    *   **Justfile Location:** Place the `justfile` at the root of the project for easy discovery.
+    *   **Environment Variables:** Use environment variables for configuration and secrets.
+*   **Linting and Formatting:** Use `just --fmt` to format your `justfile`.  There are no specific linters available at this time but adhering to a single style throughout a project helps with readability.
+*   **Deployment Best Practices:**
+    *   **Version Control:**  Store your `justfile` in version control alongside your source code.
+    *   **Continuous Integration:**  Integrate `just` into your CI/CD pipeline to automate builds, tests, and deployments.
+*   **CI/CD Integration:**
+    *   Use `just` to define the build, test, and deployment steps in your CI/CD pipeline.
+    *   Run `just` commands in your CI/CD environment to automate the build process.
+
+By following these best practices, you can ensure that your `justfile` is well-organized, maintainable, and efficient.

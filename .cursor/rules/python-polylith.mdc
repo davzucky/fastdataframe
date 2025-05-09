@@ -1,0 +1,217 @@
+---
+description: This rule provides best practices for developing Python applications using the Polylith architecture, focusing on code organization, component design, and efficient tooling.
+globs: **/*.py
+---
+---
+## Python Polylith Architecture Best Practices
+
+This guide outlines best practices for developing and maintaining Python applications using the Polylith architecture. It covers aspects from code organization to testing, security, and performance optimization.
+
+### 1. Code Organization and Structure
+
+- **Directory Structure:**
+    - **`workspace` (root directory):** The top-level directory containing all projects.
+    - **`components`:** Contains reusable, framework-agnostic components (the 'bricks'). Each component should perform a single, well-defined task.
+        - `component_name/`:
+            - `__init__.py`:  Marks the directory as a Python package. Crucial for namespace isolation.
+            - `core.py`: Contains the main logic of the component. (Required file by convention, helps maintain consistency)
+            - `interface.py`: Defines the public API of the component.  This should be stable and well-documented.
+            - `data.py`: Defines data structures (dataclasses, namedtuples) used within the component.
+            - `utils.py`: Utility functions specific to the component.
+            - `tests/`: Unit tests for the component.
+                - `test_core.py`: Tests the core logic.
+                - `conftest.py`: Fixtures for testing.
+    - **`bases`:** Contains infrastructure code, such as database connections, message queues, and external API clients. Bases bridge components and external systems.
+        - `base_name/`:
+            - `__init__.py`
+            - `adapter.py`: Contains code that adapts external systems to the components' interfaces.
+            - `settings.py`: Configuration settings for the base.
+            - `tests/`: Unit tests for the base.
+    - **`projects`:** Contains applications, services, and libraries that combine components and bases to deliver specific functionality. Avoid business logic directly in projects; delegate to components.
+        - `app_name/` or `service_name/` or `library_name/`:
+            - `__init__.py`
+            - `__main__.py` or `main.py`: Entry point for the application or service. For libraries, this might define the public interface of the library.
+            - `routes.py` (for web applications): Defines API routes and handlers.
+            - `settings.py`: Application-specific settings.
+            - `pyproject.toml`: Describes the project and its dependencies. Very important.
+            - `tests/`: Integration and end-to-end tests for the project.
+    - **`libs` (Optional):** Used for shared libraries that aren't necessarily components in the Polylith sense, but are still shared across multiple projects.  Think of helper libraries for logging, configuration, etc.
+        - `library_name/`:
+            -  `__init__.py`
+            - `module1.py`
+            - `tests/`
+- **File Naming Conventions:**
+    - Python files: Use snake_case (e.g., `user_service.py`, `data_access.py`).
+    - Class names: Use PascalCase (e.g., `UserService`, `DataAccess`).
+    - Function names: Use snake_case (e.g., `get_user`, `validate_data`).
+    - Variable names: Use snake_case (e.g., `user_id`, `api_key`).
+    - Constants: Use SCREAMING_SNAKE_CASE (e.g., `MAX_RETRIES`, `DEFAULT_TIMEOUT`).
+- **Module Organization:**
+    - Each component, base, and project should be a Python package (have an `__init__.py` file).
+    - Within each component/base/project, organize code into modules based on functionality.
+    - Use relative imports within components and bases to avoid naming conflicts.
+    - Projects import components and bases to build functionality.
+- **Component Architecture:**
+    - Components should be small, focused, and reusable.
+    - Each component should have a well-defined interface (`interface.py`) that hides its internal implementation.
+    - Favor functional programming principles within components (pure functions, immutability).
+    - Components should not depend on specific frameworks or infrastructure.
+- **Code Splitting Strategies:**
+    - Split large components into smaller, more manageable components.
+    - Identify common functionality and extract it into reusable components.
+    - Use lazy loading for components that are not immediately needed.
+
+### 2. Common Patterns and Anti-patterns
+
+- **Design Patterns:**
+    - **Adapter:** Use adapters in bases to connect components to external systems.
+    - **Dependency Injection:** Inject dependencies into components and bases to improve testability and flexibility. Use libraries like `injector` or `dependency_injector`.
+    - **Factory:** Use factories to create instances of components and bases with specific configurations.
+    - **Observer:** (If applicable): Use observer patterns to decouple components and bases, enabling event-driven architectures.
+- **Recommended Approaches:**
+    - Use dataclasses or namedtuples for data transfer objects (DTOs) within components.
+    - Use type hints extensively to improve code readability and maintainability.
+    - Use linters and formatters (e.g., `flake8`, `mypy`, `black`) to enforce code style.
+    - Document component interfaces using docstrings.
+- **Anti-patterns:**
+    - **Business Logic in Projects:** Avoid putting business logic directly in projects. Projects should primarily orchestrate components and bases.
+    - **Tight Coupling:** Avoid tight coupling between components. Components should interact through well-defined interfaces.
+    - **Framework Dependencies in Components:** Components should not depend on specific frameworks or infrastructure.
+    - **Code Duplication:** Avoid code duplication by extracting common functionality into reusable components.
+    - **Circular Dependencies:** Avoid circular dependencies between components and bases.
+- **State Management:**
+    - Components should ideally be stateless, operating on input data and returning output data without maintaining internal state.
+    - If state is necessary, manage it explicitly using immutable data structures or dedicated state management components.
+    - Use dependency injection to provide stateful components to projects.
+- **Error Handling:**
+    - Use exceptions for error handling within components and bases.
+    - Define custom exception classes for specific error conditions.
+    - Use try-except blocks to handle exceptions gracefully.
+    - Log errors with sufficient context to aid debugging.
+    - Implement retry mechanisms for transient errors when interacting with external systems in bases.
+
+### 3. Performance Considerations
+
+- **Optimization Techniques:**
+    - Profile code to identify performance bottlenecks using tools like `cProfile`.
+    - Optimize data structures and algorithms for performance.
+    - Use caching to reduce database queries or API calls.
+    - Use asynchronous programming with `asyncio` for I/O-bound operations.
+- **Memory Management:**
+    - Avoid creating large, unnecessary objects.
+    - Use generators and iterators to process large datasets efficiently.
+    - Use memory profiling tools (e.g., `memory_profiler`) to identify memory leaks.
+    - Explicitly release resources when they are no longer needed (e.g., closing file handles).
+- **Rendering Optimization (If Applicable):** (Applicable only when you are building UI applications using Python)
+    - Use efficient rendering techniques to minimize the number of DOM updates. (If using frameworks like PyQt, Tkinter, etc.)
+    - Optimize images and other assets for size and resolution.
+    - Use lazy loading for images that are not immediately visible.
+- **Bundle Size Optimization (If Applicable):**
+    - Minimize the number of dependencies in projects to reduce bundle size. (Applicable only when you are deploying Python apps with packaging tools like PyInstaller, etc.)
+    - Use tree shaking to remove unused code from bundles. (If using packaging tools with tree-shaking support.)
+- **Lazy Loading:**
+    - Use lazy loading to load components and bases only when they are needed.
+    - Use the `importlib` module to dynamically import components and bases.
+
+### 4. Security Best Practices
+
+- **Common Vulnerabilities:**
+    - **Injection Attacks (SQL, Command, etc.):** Prevent injection attacks by validating and sanitizing user input and using parameterized queries.
+    - **Cross-Site Scripting (XSS):** Prevent XSS attacks by escaping user input when rendering it in HTML.
+    - **Cross-Site Request Forgery (CSRF):** Protect against CSRF attacks by using CSRF tokens.
+    - **Authentication and Authorization Issues:** Implement robust authentication and authorization mechanisms.
+    - **Security Misconfiguration:** Follow security best practices when configuring servers and applications.
+    - **Using Components with Known Vulnerabilities:** Ensure components are updated to the latest secure versions.
+- **Input Validation:**
+    - Validate all user input to prevent injection attacks and other vulnerabilities.
+    - Use libraries like `marshmallow` or `pydantic` to define data schemas and validate input data.
+    - Sanitize user input to remove potentially harmful characters.
+- **Authentication and Authorization:**
+    - Use secure authentication mechanisms (e.g., OAuth 2.0, JWT).
+    - Implement role-based access control (RBAC) to restrict access to sensitive resources.
+    - Use encryption to protect sensitive data.
+    - Use appropriate hashing algorithms to securely store passwords (e.g., bcrypt, scrypt).
+- **Data Protection:**
+    - Encrypt sensitive data at rest and in transit.
+    - Use HTTPS for all communication.
+    - Store API keys and other secrets securely using environment variables or a secrets management system.
+    - Regularly rotate API keys and other secrets.
+- **Secure API Communication:**
+    - Use HTTPS for all API communication.
+    - Use authentication tokens to verify the identity of clients.
+    - Implement rate limiting to prevent abuse.
+    - Validate API requests and responses against a schema.
+
+### 5. Testing Approaches
+
+- **Unit Testing:**
+    - Write unit tests for all components and bases.
+    - Use a testing framework like `pytest` or `unittest`.
+    - Mock external dependencies to isolate components and bases during testing.
+    - Aim for high code coverage.
+- **Integration Testing:**
+    - Write integration tests to verify the interaction between components and bases.
+    - Use a testing framework like `pytest` or `unittest`.
+    - Test the integration with external systems.
+- **End-to-End Testing:**
+    - Write end-to-end tests to verify the entire application flow.
+    - Use a testing framework like `pytest` or `behave`.
+    - Test the application in a production-like environment.
+- **Test Organization:**
+    - Organize tests into separate directories for unit, integration, and end-to-end tests.
+    - Use descriptive test names.
+    - Follow a consistent testing pattern.
+    - Use fixtures to set up test data and dependencies.
+- **Mocking and Stubbing:**
+    - Use mocking libraries like `unittest.mock` or `pytest-mock` to mock external dependencies.
+    - Use stubbing to replace complex dependencies with simpler implementations for testing.
+
+### 6. Common Pitfalls and Gotchas
+
+- **Frequent Mistakes:**
+    - **Over-Engineering Components:** Avoid making components too complex or generic.
+    - **Ignoring Interface Design:** Neglecting the design of component interfaces can lead to tight coupling and reduced reusability.
+    - **Direct Database Access in Components:** Components should not directly access the database; delegate this to bases.
+    - **Lack of Testing:** Failing to write adequate tests can lead to bugs and regressions.
+    - **Not Using Relative Imports:** Using absolute imports within components can break the Polylith structure.
+- **Edge Cases:**
+    - **Handling Configuration:** Configuration management can be complex in Polylith applications; use a consistent approach.
+    - **Managing Dependencies:** Dependency management can be challenging; use a dependency management tool like `poetry` or `pipenv`.
+    - **Asynchronous Programming:** Asynchronous programming can introduce complexity; use it carefully.
+- **Version-Specific Issues:**
+    - Be aware of version-specific issues with Python and its libraries.
+    - Test applications with different versions of Python to ensure compatibility.
+    - Pin dependencies to specific versions to avoid unexpected behavior.
+- **Compatibility Concerns:**
+    - Be aware of compatibility concerns between Python and other technologies (e.g., databases, message queues).
+    - Use appropriate adapters to ensure compatibility.
+    - Test applications with different versions of dependencies to ensure compatibility.
+- **Debugging Strategies:**
+    - Use a debugger to step through code and inspect variables.
+    - Use logging to track the execution flow of the application.
+    - Use profiling tools to identify performance bottlenecks.
+    - Use unit tests to isolate and debug individual components.
+
+### 7. Tooling and Environment
+
+- **Recommended Development Tools:**
+    - **IDE:** Use a powerful IDE like VS Code, PyCharm, or Sublime Text.
+    - **Dependency Management:** Use `poetry` or `pipenv` for dependency management.
+    - **Linting and Formatting:** Use `flake8`, `mypy`, and `black` for linting and formatting.
+    - **Testing:** Use `pytest` or `unittest` for testing.
+    - **Debugging:** Use a debugger like `pdb` or `ipdb`.
+- **Build Configuration:**
+    - Use `pyproject.toml` to configure the build process.
+    - Define dependencies and build scripts in `pyproject.toml`.
+    - Use a build tool like `poetry` or `hatch` to build the application.
+- **Linting and Formatting:**
+    - Configure linters and formatters to automatically check code style.
+    - Use pre-commit hooks to run linters and formatters before committing code.
+- **Deployment:**
+    - Use Docker to containerize the application.
+    - Use a deployment platform like AWS, Google Cloud, or Azure.
+    - Use a CI/CD pipeline to automate the deployment process.
+- **CI/CD Integration:**
+    - Use a CI/CD platform like Jenkins, Travis CI, or GitHub Actions.
+    - Configure the CI/CD pipeline to run tests, linters, and formatters.
+    - Automate the deployment process using the CI/CD pipeline.
