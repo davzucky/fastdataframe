@@ -1,0 +1,42 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+---
+
+# Project
+
+This is the main rule that help for working with this project. 
+
+## Language
+
+- The library is written using `Python` language
+- `just` is used to automate all the command and centralize them
+- `devcontainer` is used to setup the workspace for developer
+- `uv` is python build tool 
+- All code need to be tested using `pytest`
+- Everytime you write a new feature you need to write the equivalent test
+
+# What is here?
+
+`fastdataframe` is a moderm library that aim to join the world of `pydantic` with `dataframes`
+The library aim to be a bridge between `pydantic` <-> `dataframe libraries` and a standard that can be use accross multiple implementation of dataframe like
+
+- `Polars dataframe`
+- `Polars lazyframe`
+- `Pandas dataframe`
+- `Pyarrow dataframe`
+- 'pyiceberg`
+
+
+The idea is similar to 
+- `SQLModel` https://github.com/fastapi/sqlmodel/tree/main
+- `Patito` https://github.com/JakobGM/patito
+
+## Key capability
+
+The core functionallity that we want to have are
+- validate a dataframe from a pydantic model
+- Transform a dataframe to return a enumeration of pydantic model
+- Create a dataframe from a list of model with the right type
