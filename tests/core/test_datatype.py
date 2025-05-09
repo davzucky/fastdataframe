@@ -37,100 +37,152 @@ from fastdataframe.core.datatype import (
     Unknown,
 )
 
-def test_numeric_types():
-    """Test numeric data types."""
-    # Decimal
-    decimal_type = FastDecimal(precision=10, scale=2)
-    assert decimal_type.to_python() == Decimal
-    
+@pytest.mark.parametrize("dtype_class,expected_type,init_params", [
+    # Decimal type
+    (FastDecimal, Decimal, {"precision": 10, "scale": 2}),
     # Float types
-    assert Float32().to_python() == float
-    assert Float64().to_python() == float
-    
+    (Float32, float, {}),
+    (Float64, float, {}),
     # Signed integer types
-    assert Int8().to_python() == int
-    assert Int16().to_python() == int
-    assert Int32().to_python() == int
-    assert Int64().to_python() == int
-    assert Int128().to_python() == int
-    
+    (Int8, int, {}),
+    (Int16, int, {}),
+    (Int32, int, {}),
+    (Int64, int, {}),
+    (Int128, int, {}),
     # Unsigned integer types
-    assert UInt8().to_python() == int
-    assert UInt16().to_python() == int
-    assert UInt32().to_python() == int
-    assert UInt64().to_python() == int
+    (UInt8, int, {}),
+    (UInt16, int, {}),
+    (UInt32, int, {}),
+    (UInt64, int, {}),
+])
+def test_numeric_types(dtype_class, expected_type, init_params):
+    """Test numeric data types.
+    
+    Args:
+        dtype_class: The data type class to test
+        expected_type: The expected Python type
+        init_params: Parameters to initialize the data type class
+    """
+    dtype = dtype_class(**init_params)
+    assert dtype.to_python() == expected_type
 
-def test_temporal_types():
-    """Test temporal data types."""
-    # Date
-    assert Date().to_python() == date
+@pytest.mark.parametrize("dtype_class,expected_type,init_params,extra_checks", [
+    # Date type
+    (Date, date, {}, []),
+    # Datetime type
+    (Datetime, datetime, {"time_unit": "us", "time_zone": "UTC"}, [
+        lambda dtype: dtype.time_unit == "us",
+        lambda dtype: dtype.time_zone == "UTC"
+    ]),
+    # Duration type
+    (Duration, timedelta, {"time_unit": "us"}, [
+        lambda dtype: dtype.time_unit == "us"
+    ]),
+    # Time type
+    (Time, time, {}, [])
+])
+def test_temporal_types(dtype_class, expected_type, init_params, extra_checks):
+    """Test temporal data types.
     
-    # Datetime
-    datetime_type = Datetime(time_unit="us", time_zone="UTC")
-    assert datetime_type.to_python() == datetime
-    assert datetime_type.time_unit == "us"
-    assert datetime_type.time_zone == "UTC"
+    Args:
+        dtype_class: The data type class to test
+        expected_type: The expected Python type
+        init_params: Parameters to initialize the data type class
+        extra_checks: Additional assertions to run on the data type instance
+    """
+    dtype = dtype_class(**init_params)
+    assert dtype.to_python() == expected_type
     
-    # Duration
-    duration_type = Duration(time_unit="us")
-    assert duration_type.to_python() == timedelta
-    assert duration_type.time_unit == "us"
-    
-    # Time
-    assert Time().to_python() == time
+    # Run any additional checks
+    for check in extra_checks:
+        assert check(dtype)
 
-def test_nested_types():
-    """Test nested data types."""
-    # Array
-    array_type = Array(inner=Int32(), shape=(2, 3), width=6)
-    assert array_type.to_python() == list[int]
-    assert array_type.shape == (2, 3)
-    assert array_type.width == 6
+@pytest.mark.parametrize("dtype_class,inner_type,init_params,expected_type,extra_checks", [
+    # Array type
+    (Array, Int32, {"shape": (2, 3), "width": 6}, list[int], [
+        lambda dtype: dtype.shape == (2, 3),
+        lambda dtype: dtype.width == 6
+    ]),
+    # List type
+    (FastList, String, {}, list[str], []),
+    # Field type
+    (Field, Int32, {"name": "age", "dtype": Int32()}, Dict[str, int], [
+        lambda dtype: dtype.name == "age"
+    ]),
+    # Struct type
+    (Struct, None, {
+        "fields": [
+            Field(name="age", dtype=Int32()),
+            Field(name="name", dtype=String())
+        ]
+    }, Dict[str, Any], [
+        lambda dtype: len(dtype.fields) == 2
+    ])
+])
+def test_nested_types(dtype_class, inner_type, init_params, expected_type, extra_checks):
+    """Test nested data types.
     
-    # List
-    list_type = FastList(inner=String())
-    assert list_type.to_python() == list[str]
+    Args:
+        dtype_class: The data type class to test
+        inner_type: The inner type class for nested types
+        init_params: Parameters to initialize the data type class
+        expected_type: The expected Python type
+        extra_checks: Additional assertions to run on the data type instance
+    """
+    if inner_type is not None and "dtype" not in init_params:
+        init_params["inner"] = inner_type()
+    dtype = dtype_class(**init_params)
+    assert dtype.to_python() == expected_type
     
-    # Field
-    field_type = Field(name="age", dtype=Int32())
-    assert field_type.to_python() == Dict[str, int]
-    assert field_type.name == "age"
-    
-    # Struct
-    fields = [
-        Field(name="age", dtype=Int32()),
-        Field(name="name", dtype=String()),
-    ]
-    struct_type = Struct(fields=fields)
-    assert struct_type.to_python() == Dict[str, Any]
-    assert len(struct_type.fields) == 2
+    # Run any additional checks
+    for check in extra_checks:
+        assert check(dtype)
 
-def test_string_types():
-    """Test string data types."""
-    # String
-    assert String().to_python() == str
+@pytest.mark.parametrize("dtype_class,init_params,expected_type,extra_checks", [
+    # String type
+    (String, {}, str, []),
+    # Categorical type
+    (Categorical, {}, str, []),
+    # Enum type
+    (Enum, {"values": ["A", "B", "C"]}, str, [
+        lambda dtype: dtype.values == ["A", "B", "C"]
+    ])
+])
+def test_string_types(dtype_class, init_params, expected_type, extra_checks):
+    """Test string data types.
     
-    # Categorical
-    assert Categorical().to_python() == str
+    Args:
+        dtype_class: The data type class to test
+        init_params: Parameters to initialize the data type class
+        expected_type: The expected Python type
+        extra_checks: Additional assertions to run on the data type instance
+    """
+    dtype = dtype_class(**init_params)
+    assert dtype.to_python() == expected_type
     
-    # Enum
-    enum_type = Enum(values=["A", "B", "C"])
-    assert enum_type.to_python() == str
-    assert enum_type.values == ["A", "B", "C"]
+    # Run any additional checks
+    for check in extra_checks:
+        assert check(dtype)
 
-def test_other_types():
-    """Test other data types."""
-    # Binary
-    assert Binary().to_python() == bytes
+@pytest.mark.parametrize("dtype_class,expected_type,init_params", [
+    # Binary type
+    (Binary, bytes, {}),
+    # Boolean type
+    (Boolean, bool, {}),
+    # Null type
+    (Null, type(None), {}),
+    # Object type
+    (Object, object, {}),
+    # Unknown type
+    (Unknown, Any, {})
+])
+def test_other_types(dtype_class, expected_type, init_params):
+    """Test other data types.
     
-    # Boolean
-    assert Boolean().to_python() == bool
-    
-    # Null
-    assert Null().to_python() == type(None)
-    
-    # Object
-    assert Object().to_python() == object
-    
-    # Unknown
-    assert Unknown().to_python() == Any 
+    Args:
+        dtype_class: The data type class to test
+        expected_type: The expected Python type
+        init_params: Parameters to initialize the data type class
+    """
+    dtype = dtype_class(**init_params)
+    assert dtype.to_python() == expected_type 
