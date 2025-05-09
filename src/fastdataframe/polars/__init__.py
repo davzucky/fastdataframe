@@ -1,3 +1,3 @@
 """Polars integration for FastDataframe."""
 
-__all__ = [] 
+__all__: list[str] = [] 
