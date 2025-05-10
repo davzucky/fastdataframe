@@ -220,6 +220,38 @@ class Unknown(DataType):
     def to_python(self) -> Type[Any]:
         return Any
 
+# Union type of all data types
+fdtypes = Union[
+    Decimal,
+    Float32,
+    Float64,
+    Int8,
+    Int16,
+    Int32,
+    Int64,
+    Int128,
+    UInt8,
+    UInt16,
+    UInt32,
+    UInt64,
+    Date,
+    Datetime,
+    Duration,
+    Time,
+    Array,
+    List,
+    Field,
+    Struct,
+    String,
+    Categorical,
+    Enum,
+    Binary,
+    Boolean,
+    Null,
+    Object,
+    Unknown,
+]
+
 __all__ = [
     "DataType",
     "Decimal",
@@ -250,4 +282,5 @@ __all__ = [
     "Null",
     "Object",
     "Unknown",
+    "fdtypes",
 ] 
