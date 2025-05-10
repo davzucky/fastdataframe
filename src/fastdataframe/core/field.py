@@ -1,4 +1,4 @@
-from typing import Any, Optional, TypeVar, overload
+from typing import Any, Optional, TypeVar, overload, Union
 from pydantic.fields import FieldInfo as PydanticFieldInfo
 from pydantic import Field as PydanticField
 
@@ -21,6 +21,24 @@ class FieldInfo(PydanticFieldInfo):
         super().__init__(**kwargs)
         self.unique = unique
         self.allow_missing = allow_missing
+
+    @property
+    def allow_null(self) -> bool:
+        """Check if the field's annotation allows None values.
+        
+        Returns:
+            bool: True if the field can be None, False otherwise.
+        """
+        annotation = getattr(self, "annotation", None)
+        if annotation is None:
+            return False
+        
+        # Handle Optional types
+        if hasattr(annotation, "__origin__") and annotation.__origin__ is Union:
+            return type(None) in annotation.__args__
+        
+        # Handle direct None type
+        return annotation is type(None)
 
     def model_dump(self) -> dict[str, Any]:
         """Convert the field info to a dictionary."""
