@@ -1,37 +1,46 @@
 from pydantic import BaseModel
-from fastdataframe.core.field import FieldInfo
+from fastdataframe.core.field import Field
+from fastdataframe.core.model import FastDataframeModel
 from typing import Optional, Union, Any
 
 def test_field_with_default():
     """Test Field with a default value"""
-    field = FieldInfo(default="test", unique=True, allow_missing=False)
-    assert isinstance(field, FieldInfo)
-    assert field.default == "test"
-    assert field.unique is True
-    assert field.allow_missing is False
+    class TestModel(FastDataframeModel):
+        name: str = Field(default="test", unique=True, allow_missing=False)
+    
+    model = TestModel()
+    assert model.name == "test"
+    field_info = TestModel.model_fields["name"]
+    assert field_info.unique is True
+    assert field_info.allow_missing is False
 
 def test_field_with_default_factory():
     """Test Field with a default_factory"""
-    field = FieldInfo(default_factory=list, unique=False, allow_missing=True)
-    assert isinstance(field, FieldInfo)
-    assert field.default_factory == list
-    assert field.unique is False
-    assert field.allow_missing is True
+    class TestModel(FastDataframeModel):
+        items: list = Field(default_factory=list, unique=False, allow_missing=True)
+    
+    model = TestModel()
+    assert model.items == []
+    field_info = TestModel.model_fields["items"]
+    assert field_info.unique is False
+    assert field_info.allow_missing is True
 
 def test_field_without_default():
     """Test Field without default value"""
-    field = FieldInfo(unique=True, allow_missing=True)
-    assert isinstance(field, FieldInfo)
-    assert field.default is None
-    assert field.unique is True
-    assert field.allow_missing is True
+    class TestModel(FastDataframeModel):
+        name: str = Field(unique=True, allow_missing=True)
+    
+    field_info = TestModel.model_fields["name"]
+    assert field_info.default is None
+    assert field_info.unique is True
+    assert field_info.allow_missing is True
 
 def test_field_in_model():
-    """Test Field usage in a Pydantic model"""
-    class TestModel(BaseModel):
-        name: str = FieldInfo(default="John", unique=True)
-        age: int = FieldInfo(allow_missing=True)
-        items: list = FieldInfo(default_factory=list, unique=True)
+    """Test Field usage in a FastDataframeModel"""
+    class TestModel(FastDataframeModel):
+        name: str = Field(default="John", unique=True)
+        age: int = Field(allow_missing=True)
+        items: list = Field(default_factory=list, unique=True)
 
     model = TestModel()
     assert model.name == "John"
@@ -45,31 +54,40 @@ def test_field_in_model():
     assert model.items == [1, 2, 3]
 
 def test_field_info_allow_null():
-    """Test the allow_null property of FieldInfo."""
-    # Test with non-optional type
-    field = FieldInfo(annotation=int)
-    assert not field.allow_null
+    """Test the allow_null property of Field."""
+    class TestModel(FastDataframeModel):
+        # Test with non-optional type
+        required_int: int = Field()
+        
+        # Test with Optional type
+        optional_int: Optional[int] = Field()
+        
+        # Test with Union type containing None
+        union_int: Union[int, None] = Field()
+        
+        # Test with direct None type
+        none_type: type(None) = Field()
+        
+        # Test with Union type not containing None
+        union_int_str: Union[int, str] = Field()
+        
+        # Test with Any type
+        any_type: Any = Field()
 
-    # Test with Optional type
-    field = FieldInfo(annotation=Optional[int])
-    assert field.allow_null
+    # Test non-optional type
+    assert not TestModel.model_fields["required_int"].allow_null
 
-    # Test with Union type containing None
-    field = FieldInfo(annotation=Union[int, None])
-    assert field.allow_null
+    # Test Optional type
+    assert TestModel.model_fields["optional_int"].allow_null
 
-    # Test with direct None type
-    field = FieldInfo(annotation=type(None))
-    assert field.allow_null
+    # Test Union type containing None
+    assert TestModel.model_fields["union_int"].allow_null
 
-    # Test with Union type not containing None
-    field = FieldInfo(annotation=Union[int, str])
-    assert not field.allow_null
+    # Test direct None type
+    assert TestModel.model_fields["none_type"].allow_null
 
-    # Test with no annotation
-    field = FieldInfo()
-    assert not field.allow_null
+    # Test Union type not containing None
+    assert not TestModel.model_fields["union_int_str"].allow_null
 
-    # Test with Any type
-    field = FieldInfo(annotation=Any)
-    assert not field.allow_null 
+    # Test Any type
+    assert not TestModel.model_fields["any_type"].allow_null 
