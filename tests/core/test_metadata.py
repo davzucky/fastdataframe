@@ -1,8 +1,9 @@
-"""Tests for the FastDataframe metadata class."""
+"""Tests for FastDataframe metadata implementation."""
 
 import dataclasses
 import pytest
-from fastdataframe.core.metadata import FastDataframe
+from typing import Optional, Union, Annotated
+from fastdataframe.core.annotation import FastDataframe
 
 def test_fastdataframe_default_values():
     """Test that FastDataframe has correct default values."""

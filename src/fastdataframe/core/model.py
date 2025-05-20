@@ -7,7 +7,7 @@ from pydantic._internal._model_construction import (
     ModelMetaclass as PydanticModelMetaclass,
 )
 
-from .metadata import FastDataframe
+from .annotation import FastDataframe
 from .types_helper import contains_type, filter_type, get_item_of_type
 
 T = TypeVar("T", bound="FastDataframeModel")

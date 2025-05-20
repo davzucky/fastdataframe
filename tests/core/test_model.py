@@ -5,7 +5,7 @@ from pydantic import Field
 import pytest
 
 from fastdataframe.core.model import FastDataframeModel
-from fastdataframe.core.metadata import FastDataframe
+from fastdataframe.core.annotation import FastDataframe
 
 @pytest.mark.parametrize(
     "field_type,expected_is_nullable,expected_is_unique",

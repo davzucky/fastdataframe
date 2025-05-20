@@ -1,4 +1,4 @@
-"""Metadata classes for FastDataframe."""
+"""Annotation classes for FastDataframe."""
 
 from dataclasses import dataclass, replace
 from typing import Any, Optional, Self
@@ -8,9 +8,9 @@ from .types_helper import is_optional_type
 
 @dataclass(frozen=True)
 class FastDataframe(PydanticMetadata, BaseMetadata):
-    """Custom metadata for FastDataframe fields.
+    """Custom annotation for FastDataframe fields.
     
-    This metadata class is used to store additional information about fields
+    This annotation class is used to store additional information about fields
     that are used in FastDataframe operations.
     
     Attributes:
