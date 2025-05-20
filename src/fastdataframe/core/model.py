@@ -51,16 +51,15 @@ class FastDataframeModelMetaclass(PydanticModelMetaclass):
 class FastDataframeModel(BaseModel, metaclass=FastDataframeModelMetaclass):
     """Base model that enforces FastDataframe annotation on all fields."""
 
-    # model_config = ConfigDict(arbitrary_types_allowed=True)
 
-    # @classmethod
-    # def model_json_schema(cls, **kwargs: Any) -> Dict[str, Any]:
-    #     """Generate JSON schema with FastDataframe metadata."""
-    #     schema = super().model_json_schema(**kwargs)
+    @classmethod
+    def get_fastdataframe_annotations(cls) -> dict[str, FastDataframe]:
+        """Return a dictionary mapping field_name to FastDataframe annotation objects from the model_json_schema."""
+        schema = cls.model_json_schema()
+        fastdataframes = {}
+        for field_name, field_schema in schema.get("properties", {}).items():
+            fastdataframe_doc = field_schema.get("_fastdataframe")
+            if fastdataframe_doc:
+                fastdataframes[field_name] = FastDataframe.from_schema({"json_schema_extra": {"_fastdataframe": fastdataframe_doc}})
+        return fastdataframes
 
-    #     # Add FastDataframe metadata to each property
-    #     for field_name, field in cls.model_fields.items():
-    #         if isinstance(field.json_schema_extra, dict) and "_fastdataframe" in field.json_schema_extra:
-    #             schema["properties"][field_name]["_fastdataframe"] = field.json_schema_extra["_fastdataframe"]
-
-    #     return schema

@@ -73,3 +73,20 @@ def test_model_base_type(field_type: Any, expected_is_nullable: bool, expected_i
     fastdataframe_props = schema["properties"]["test_field"]["_fastdataframe"]["properties"]
     assert fastdataframe_props["is_nullable"] is expected_is_nullable
     assert fastdataframe_props["is_unique"] is expected_is_unique
+    
+def test_get_fastdataframe_annotations():
+    """Test that get_fastdataframe_annotations returns a dictionary mapping field_name to FastDataframe annotation objects."""
+    class MyModel(FastDataframeModel):
+        field1: int
+        field2: str
+        field3: Optional[float] = None
+        field4: Annotated[bool, FastDataframe(is_unique=True)]
+
+    annotations = MyModel.get_fastdataframe_annotations()
+    assert isinstance(annotations, dict)
+    assert "field1" in annotations
+    assert "field2" in annotations
+    assert "field3" in annotations
+    assert "field4" in annotations
+    assert annotations["field4"].is_unique is True
+    assert annotations["field3"].is_nullable is True
