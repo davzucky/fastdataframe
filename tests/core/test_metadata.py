@@ -2,8 +2,7 @@
 
 import dataclasses
 import pytest
-from pydantic import BaseModel
-from fastdataframe.metadata import FastDataframe
+from fastdataframe.core.metadata import FastDataframe
 
 def test_fastdataframe_default_values():
     """Test that FastDataframe has correct default values."""

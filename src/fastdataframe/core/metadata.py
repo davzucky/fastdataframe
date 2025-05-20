@@ -1,10 +1,10 @@
 """Metadata classes for FastDataframe."""
 
-from dataclasses import dataclass
-from typing import Any, get_type_hints
-from pydantic import BaseModel
+from dataclasses import dataclass, replace
+from typing import Any, Optional, Self
 from pydantic._internal._fields import PydanticMetadata
 from annotated_types import BaseMetadata
+from .types_helper import is_optional_type
 
 @dataclass(frozen=True)
 class FastDataframe(PydanticMetadata, BaseMetadata):
@@ -17,7 +17,7 @@ class FastDataframe(PydanticMetadata, BaseMetadata):
         is_nullable: Whether the field can be null/None
         is_unique: Whether the field values must be unique
     """
-    is_nullable: bool = True
+    is_nullable: Optional[bool] = None
     is_unique: bool = False
 
     def __get_pydantic_core_schema__(self, source_type: Any, handler: Any) -> dict[str, Any]:
@@ -70,6 +70,19 @@ class FastDataframe(PydanticMetadata, BaseMetadata):
         return json_schema
 
     @classmethod
+    def from_field_type(cls, field_type: Any) -> Self:
+        """Create a FastDataframe instance from field metadata.
+        
+        Args:
+            field_type: The field type containing FastDataframe information
+            
+        Returns:
+            A new FastDataframe instance
+        """
+        return cls(is_nullable=is_optional_type(field_type))
+            
+
+    @classmethod
     def from_schema(cls, schema: dict[str, Any]) -> 'FastDataframe':
         """Create a FastDataframe instance from a schema.
         
@@ -105,6 +118,18 @@ class FastDataframe(PydanticMetadata, BaseMetadata):
             raise ValueError(f"Missing required properties: {required_props - set(properties.keys())}")
             
         return cls(**properties)
+
+    def set_is_nullable_from_type(self, field_type: Any) -> Self:
+        """Set the is_nullable attribute.
+        
+        Args:
+            is_nullable: The new value for is_nullable
+            
+        Returns:
+            A new FastDataframe instance with the updated is_nullable attribute
+        """
+        return replace(self,is_nullable=is_optional_type(field_type))
+    
 
     def as_field_metadata(self) -> dict[str, Any]:
         """Return a dictionary suitable for use as Pydantic Field(json_schema_extra=...)."""
