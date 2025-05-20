@@ -7,7 +7,7 @@ from fastdataframe.core.metadata import FastDataframe
 def test_fastdataframe_default_values():
     """Test that FastDataframe has correct default values."""
     metadata = FastDataframe()
-    assert metadata.is_nullable is True
+    assert metadata.is_nullable is None
     assert metadata.is_unique is False
 
 def test_fastdataframe_custom_values():
