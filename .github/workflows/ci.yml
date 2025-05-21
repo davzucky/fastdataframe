@@ -43,13 +43,13 @@ jobs:
           junit/test-results-${{ matrix.python-version }}.xml
           coverage.xml
 
-    - name: Upload coverage to Codecov
-      uses: codecov/codecov-action@v5
-      env:
-        CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
-      with:
-        file: ./coverage.xml
-        fail_ci_if_error: true
+    # - name: Upload coverage to Codecov
+    #   uses: codecov/codecov-action@v5
+    #   env:
+    #     CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+    #   with:
+    #     file: ./coverage.xml
+    #     fail_ci_if_error: true
 
   build:
     needs: test
