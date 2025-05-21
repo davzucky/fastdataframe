@@ -118,9 +118,9 @@ def test_fastdataframe_from_schema_missing_properties() -> None:
 def test_fastdataframe_immutability() -> None:
     """Test that FastDataframe instances are immutable."""
     metadata = FastDataframe()
-    
+
     with pytest.raises(dataclasses.FrozenInstanceError):
-        object.__setattr__(metadata, "is_nullable", False)  # type: ignore[misc]
-    
+        metadata.is_nullable = False  # type: ignore[misc]
+
     with pytest.raises(dataclasses.FrozenInstanceError):
-        object.__setattr__(metadata, "is_unique", True)  # type: ignore[misc] 
+        metadata.is_unique = True  # type: ignore[misc] 
