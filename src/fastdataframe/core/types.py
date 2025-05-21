@@ -1,5 +1,10 @@
+import logging
+from typing import Any
+
+logger = logging.getLogger(__name__)
+
 # Helper: normalize type field to a set
-def normalize_type(t):
+def normalize_type(t: Any) -> set:
     if isinstance(t, list):
         return set(t)
     if t is None:
@@ -7,15 +12,15 @@ def normalize_type(t):
     return {t}
 
 # Helper: filter out ignorable types from a list of options
-def filter_options(options, ignorable_types):
+def filter_options(options: list[dict], ignorable_types: set) -> list[dict]:
     return [opt for opt in options if opt.get("type") not in ignorable_types]
 
 # Helper: check if schema is a union (anyOf/oneOf)
-def is_union(schema):
+def is_union(schema: dict) -> bool:
     return any(k in schema for k in ("anyOf", "oneOf"))
 
 # Helper: get union options from schema
-def get_union_options(schema):
+def get_union_options(schema: dict) -> Any:
     for k in ("anyOf", "oneOf"):
         if k in schema:
             return schema[k]
@@ -36,18 +41,23 @@ def constraints_are_superset(left: dict, right: dict, keys: list[str]) -> bool:
             continue  # right is unconstrained, left can be anything
         if key in ("minimum", "exclusiveMinimum", "minLength", "minItems"):
             if l is not None and l > r:
+                logger.debug(f"Constraint fail: {key}: left {l} > right {r}")
                 return False
         elif key in ("maximum", "exclusiveMaximum", "maxLength", "maxItems"):
             if l is not None and l < r:
+                logger.debug(f"Constraint fail: {key}: left {l} < right {r}")
                 return False
         elif key == "multipleOf":
             if l is not None and (r % l != 0):
+                logger.debug(f"Constraint fail: multipleOf: right {r} % left {l} != 0")
                 return False
         elif key == "pattern":
             if l is not None and l != r:
+                logger.debug(f"Constraint fail: pattern: left {l} != right {r}")
                 return False
         elif key == "uniqueItems":
             if r is False and l is not False:
+                logger.debug(f"Constraint fail: uniqueItems: right is False, left is not False")
                 return False
     return True
 
@@ -59,12 +69,14 @@ def array_schema_is_subset(left: dict, right: dict) -> bool:
     - Otherwise, left's items must be a superset of right's items.
     - Checks array constraints: minItems, maxItems, uniqueItems
     """
-    # Array constraints
     if not constraints_are_superset(left, right, ["minItems", "maxItems", "uniqueItems"]):
+        logger.debug("Array constraint check failed.")
         return False
     left_items = left.get("items", {})
     right_items = right.get("items", {})
     if not right_items:
+        if left_items:
+            logger.debug("Right array items unconstrained, but left is constrained.")
         return not left_items
     return json_schema_is_subset(left_items, right_items)
 
@@ -79,8 +91,10 @@ def object_schema_is_subset(left: dict, right: dict) -> bool:
     right_props = right.get("properties", {})
     for prop in right_props:
         if prop not in left_props:
+            logger.debug(f"Object property '{prop}' missing in left.")
             return False
         if not json_schema_is_subset(left_props[prop], right_props[prop]):
+            logger.debug(f"Object property '{prop}' is not a superset.")
             return False
     return True
 
@@ -94,7 +108,11 @@ def format_is_superset(left: dict, right: dict) -> bool:
     left_format = left.get("format")
     right_format = right.get("format")
     if right_format is None:
+        if left_format is not None:
+            logger.debug(f"Format fail: right has no format, left has {left_format}")
         return left_format is None
+    if left_format != right_format:
+        logger.debug(f"Format fail: left {left_format} != right {right_format}")
     return left_format == right_format
 
 
@@ -127,40 +145,46 @@ def json_schema_is_subset(left: dict, right: dict) -> bool:
 
     # If right is empty (accepts anything), only an empty left is a superset
     if not right:
+        if left:
+            logger.debug("Right is unconstrained, but left is not.")
         return not left
 
     left_union = get_union_options(left)
     right_union = get_union_options(right)
 
     # --- Union/anyOf/oneOf Handling ---
-    # If right is a union: For every right option, there must be a left option that is a superset of it.
     if right_union is not None:
         for r_opt in right_union:
             if left_union is None:
-                # Left must cover all right options
                 if not json_schema_is_subset(left, r_opt):
+                    logger.debug("Union: left is not a superset of right option.")
                     return False
             else:
-                # For each right option, there must be a left option that is a superset
                 if not any(json_schema_is_subset(l_opt, r_opt) for l_opt in left_union):
+                    logger.debug("Union: no left option is a superset of right option.")
                     return False
         return True
-    # If left is a union and right is not: If any left option is a superset of right, return True.
     elif left_union is not None:
-        return any(json_schema_is_subset(l_opt, right) for l_opt in left_union)
+        if not any(json_schema_is_subset(l_opt, right) for l_opt in left_union):
+            logger.debug("Union: no left option is a superset of right.")
+            return False
+        return True
 
     # --- Type Handling ---
     left_types = normalize_type(left.get("type"))
     right_types = normalize_type(right.get("type"))
     if not left_types.issuperset(right_types):
+        logger.debug(f"Type fail: left {left_types} is not a superset of right {right_types}")
         return False
 
     # --- Numeric Constraints ---
     if not constraints_are_superset(left, right, ["minimum", "maximum", "exclusiveMinimum", "exclusiveMaximum", "multipleOf"]):
+        logger.debug("Numeric constraint check failed.")
         return False
 
     # --- String Constraints ---
     if not constraints_are_superset(left, right, ["minLength", "maxLength", "pattern"]):
+        logger.debug("String constraint check failed.")
         return False
 
     # --- Format Handling ---
