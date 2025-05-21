@@ -1,3 +1,26 @@
+# Helper: normalize type field to a set
+def normalize_type(t):
+    if isinstance(t, list):
+        return set(t)
+    if t is None:
+        return set()
+    return {t}
+
+# Helper: filter out ignorable types from a list of options
+def filter_options(options, ignorable_types):
+    return [opt for opt in options if opt.get("type") not in ignorable_types]
+
+# Helper: check if schema is a union (anyOf/oneOf)
+def is_union(schema):
+    return any(k in schema for k in ("anyOf", "oneOf"))
+
+# Helper: get union options from schema
+def get_union_options(schema):
+    for k in ("anyOf", "oneOf"):
+        if k in schema:
+            return schema[k]
+    return None
+
 def json_schema_is_subset(left: dict, right: dict) -> bool:
     """
     Returns True if the left JSON schema is a subset of (compatible with) the right schema.
@@ -11,12 +34,6 @@ def json_schema_is_subset(left: dict, right: dict) -> bool:
     # Early return for identical schemas
     if left == right:
         return True
-    def normalize_type(t):
-        if isinstance(t, list):
-            return set(t)
-        if t is None:
-            return set()
-        return {t}
 
     # If both are empty, they are equal
     if not left and not right:
