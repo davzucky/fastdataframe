@@ -85,6 +85,19 @@ def object_schema_is_subset(left: dict, right: dict) -> bool:
     return True
 
 
+def format_is_superset(left: dict, right: dict) -> bool:
+    """
+    Returns True if the left format is a superset of the right format.
+    - If right has a format, left must have the same format.
+    - If right does not have a format, left must not be more restrictive (i.e., left must not have a format).
+    """
+    left_format = left.get("format")
+    right_format = right.get("format")
+    if right_format is None:
+        return left_format is None
+    return left_format == right_format
+
+
 def json_schema_is_subset(left: dict, right: dict) -> bool:
     """
     Returns True if the left JSON schema is a superset of the right schema (i.e., all values valid under right are also valid under left).
@@ -151,12 +164,7 @@ def json_schema_is_subset(left: dict, right: dict) -> bool:
         return False
 
     # --- Format Handling ---
-    left_format = left.get("format")
-    right_format = right.get("format")
-    if right_format is None:
-        if left_format is not None:
-            return False
-    elif left_format != right_format:
+    if not format_is_superset(left, right):
         return False
 
     # --- Array Handling ---
