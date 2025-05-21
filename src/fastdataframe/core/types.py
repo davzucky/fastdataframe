@@ -21,12 +21,47 @@ def get_union_options(schema):
             return schema[k]
     return None
 
+def constraints_are_superset(left: dict, right: dict, keys: list[str]) -> bool:
+    """
+    Returns True if all constraints in left are not more restrictive than those in right.
+    For min-like constraints: left[min] <= right[min] (left allows more)
+    For max-like constraints: left[max] >= right[max] (left allows more)
+    For pattern: left must be None or equal to right (left allows more)
+    For uniqueItems: left must be False if right is False (left allows more)
+    """
+    for key in keys:
+        l = left.get(key)
+        r = right.get(key)
+        if r is None:
+            continue  # right is unconstrained, left can be anything
+        if key in ("minimum", "exclusiveMinimum", "minLength", "minItems"):
+            if l is not None and l > r:
+                return False
+        elif key in ("maximum", "exclusiveMaximum", "maxLength", "maxItems"):
+            if l is not None and l < r:
+                return False
+        elif key == "multipleOf":
+            if l is not None and (r % l != 0):
+                return False
+        elif key == "pattern":
+            if l is not None and l != r:
+                return False
+        elif key == "uniqueItems":
+            if r is False and l is not False:
+                return False
+    return True
+
+
 def array_schema_is_subset(left: dict, right: dict) -> bool:
     """
     Returns True if the left array schema is a superset of the right array schema.
     - If right's items is unconstrained, left's must also be unconstrained.
     - Otherwise, left's items must be a superset of right's items.
+    - Checks array constraints: minItems, maxItems, uniqueItems
     """
+    # Array constraints
+    if not constraints_are_superset(left, right, ["minItems", "maxItems", "uniqueItems"]):
+        return False
     left_items = left.get("items", {})
     right_items = right.get("items", {})
     if not right_items:
@@ -62,8 +97,10 @@ def json_schema_is_subset(left: dict, right: dict) -> bool:
         * If left is a union and right is not: If any left option is a superset of right, return True. (Covers optionals, e.g., Optional[int] vs int, and permissive unions like float|int vs int.)
     - Optionals: Handled as unions with 'null' type. E.g., Optional[int] is {'anyOf': [{'type': 'integer'}, {'type': 'null'}]}.
     - Decimals: Often represented as unions (e.g., {'anyOf': [{'type': 'number'}, {'type': 'string'}]}). Subset logic for unions applies.
-    - Arrays: If right's items is unconstrained, left's must also be unconstrained. Otherwise, left's items must be a superset of right's items.
+    - Arrays: If right's items is unconstrained, left's must also be unconstrained. Otherwise, left's items must be a superset of right's items. Checks minItems, maxItems, uniqueItems.
     - Objects: Left can have more properties, but must cover all right properties, and each left property must be a superset of the right property.
+    - Numeric: Checks minimum, maximum, exclusiveMinimum, exclusiveMaximum, multipleOf.
+    - String: Checks minLength, maxLength, pattern.
 
     Args:
         left (dict): The candidate superset JSON schema.
@@ -103,6 +140,14 @@ def json_schema_is_subset(left: dict, right: dict) -> bool:
     left_types = normalize_type(left.get("type"))
     right_types = normalize_type(right.get("type"))
     if not left_types.issuperset(right_types):
+        return False
+
+    # --- Numeric Constraints ---
+    if not constraints_are_superset(left, right, ["minimum", "maximum", "exclusiveMinimum", "exclusiveMaximum", "multipleOf"]):
+        return False
+
+    # --- String Constraints ---
+    if not constraints_are_superset(left, right, ["minLength", "maxLength", "pattern"]):
         return False
 
     # --- Format Handling ---
