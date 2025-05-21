@@ -2,11 +2,111 @@
 
 import polars as pl
 from fastdataframe.polars.model import PolarsFastDataframeModel
+from fastdataframe.core.model import FastDataframeModel
+from typing import Optional
+
+def test_polars_availability():
+    """Test that polars package is available and can be imported."""
+    try:
+        import polars
+        assert polars.__version__ is not None, "Polars version should be available"
+    except ImportError as e:
+        raise ImportError("Polars package is not available. Please install it using 'pip install polars'") from e
 
 class TestModel(PolarsFastDataframeModel):
     """Test model for validation tests."""
     field1: int
     field2: str
+
+def test_from_fastdataframe_model_basic_conversion():
+    """Test basic conversion of FastDataframeModel to PolarsFastDataframeModel."""
+    # Create a base model
+    class BaseModel(FastDataframeModel):
+        """Base model for testing conversion."""
+        name: str
+        age: int
+        is_active: bool
+        score: Optional[float] = None
+
+    # Convert to PolarsFastDataframeModel
+    PolarsModel = PolarsFastDataframeModel.from_fastdataframe_model(BaseModel)
+
+    # Verify the new class inherits from PolarsFastDataframeModel
+    assert issubclass(PolarsModel, PolarsFastDataframeModel)
+    
+    # Verify the class name is correct
+    assert PolarsModel.__name__ == "BaseModelPolars"
+    
+    # Verify all fields are preserved
+    assert PolarsModel.__annotations__ == BaseModel.__annotations__
+    
+    # Verify the docstring is updated
+    assert PolarsModel.__doc__ == "Polars version of BaseModel"
+
+def test_from_fastdataframe_model_valid_frame():
+    """Test validation of a valid frame with the converted model."""
+    class BaseModel(FastDataframeModel):
+        name: str
+        age: int
+        is_active: bool
+        score: Optional[float] = None
+
+    PolarsModel = PolarsFastDataframeModel.from_fastdataframe_model(BaseModel)
+    
+    # Test validation with a valid frame
+    valid_frame = pl.LazyFrame({
+        "name": ["John", "Jane"],
+        "age": [30, 25],
+        "is_active": [True, False],
+        "score": [95.5, None]
+    })
+    errors = PolarsModel.validate_schema(valid_frame)
+    assert len(errors) == 0, "Valid frame should not have validation errors"
+
+def test_from_fastdataframe_model_missing_optional():
+    """Test validation of a frame missing an optional field."""
+    class BaseModel(FastDataframeModel):
+        name: str
+        age: int
+        is_active: bool
+        score: Optional[float] = None
+
+    PolarsModel = PolarsFastDataframeModel.from_fastdataframe_model(BaseModel)
+    
+    # Test validation with an invalid frame (missing required field)
+    invalid_frame = pl.LazyFrame({
+        "name": ["John", "Jane"],
+        "age": [30, 25],
+        "is_active": [True, False]
+        # score is missing but it's optional
+    })
+    errors = PolarsModel.validate_schema(invalid_frame)
+    assert len(errors) == 0, "Frame missing optional field should not have validation errors"
+
+def test_from_fastdataframe_model_type_mismatch():
+    """Test validation of a frame with type mismatches."""
+    class BaseModel(FastDataframeModel):
+        name: str
+        age: int
+        is_active: bool
+        score: Optional[float] = None
+
+    PolarsModel = PolarsFastDataframeModel.from_fastdataframe_model(BaseModel)
+    
+    # Test validation with type mismatch
+    type_mismatch_frame = pl.LazyFrame({
+        "name": ["John", "Jane"],
+        "age": ["30", "25"],  # age should be int
+        "is_active": [True, False],
+        "score": ["95.5", None]  # score should be float or None
+    })
+    errors = PolarsModel.validate_schema(type_mismatch_frame)
+    assert len(errors) == 2, "Frame with type mismatches should have two validation errors"
+    error_types = {error.column_name: error.error_type for error in errors}
+    assert "age" in error_types
+    assert "score" in error_types
+    assert error_types["age"] == "TypeMismatch"
+    assert error_types["score"] == "TypeMismatch"
 
 def test_validate_missing_columns():
     """Test that validate_schema correctly identifies missing columns."""
