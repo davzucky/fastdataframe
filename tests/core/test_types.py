@@ -22,7 +22,7 @@ from decimal import Decimal
         (dt.date, dt.datetime, False),
         (float, int, False),
         (int, float | int, False),
-        (float | int, int, False),
+        (float | int, int, True),  # float|int is a superset of int
         (None, int, False),
         (int, None, False),
         # Additional cases for bool, list, Decimal

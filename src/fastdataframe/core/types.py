@@ -23,11 +23,11 @@ def get_union_options(schema):
 
 def json_schema_is_subset(left: dict, right: dict) -> bool:
     """
-    Returns True if the left JSON schema is a subset of (compatible with) the right schema.
+    Returns True if the left JSON schema is a superset of the right schema (i.e., all values valid under right are also valid under left).
     Handles:
     - 'type' (including list of types)
     - 'format' (for temporal types)
-    - 'anyOf'/'oneOf' (recursively)
+    - 'anyOf'/'oneOf' (recursively, superset logic)
     - nullability (e.g., Optional types)
     - arrays and objects (recursively checks 'items' and 'properties')
     """
@@ -35,82 +35,61 @@ def json_schema_is_subset(left: dict, right: dict) -> bool:
     if left == right:
         return True
 
-    # If both are empty, they are equal
-    if not left and not right:
+    # If right is empty (accepts anything), only an empty left is a superset
+    if not right:
+        return not left
+
+    left_union = get_union_options(left)
+    right_union = get_union_options(right)
+
+    # Superset logic for unions (anyOf/oneOf)
+    if right_union is not None:
+        if left_union is None:
+            # Left must cover all right options
+            return all(json_schema_is_subset(left, r_opt) for r_opt in right_union)
+        # For each right option, there must be a left option that is a superset
+        for r_opt in right_union:
+            if not any(json_schema_is_subset(l_opt, r_opt) for l_opt in left_union):
+                return False
         return True
-    # If right is empty but left is not, not a subset
-    if not right and left:
-        return False
+    elif left_union is not None:
+        # Left is a union, right is not: left is a superset if any left option is a superset of right
+        return any(json_schema_is_subset(l_opt, right) for l_opt in left_union)
 
-    # Handle anyOf/oneOf in left: nuanced logic for optionals and Decimal
-    for key in ("anyOf", "oneOf"):
-        if key in left:
-            options = left[key]
-            # Optionals: ignore 'null'
-            non_null_options = [opt for opt in options if opt.get("type") != "null"]
-            null_options = [opt for opt in options if opt.get("type") == "null"]
-            if all(json_schema_is_subset(opt, right) for opt in non_null_options):
-                if len(non_null_options) + len(null_options) == len(options):
-                    return True
-            # Decimals: ignore 'string'
-            non_string_options = [opt for opt in options if opt.get("type") != "string"]
-            string_options = [opt for opt in options if opt.get("type") == "string"]
-            if all(json_schema_is_subset(opt, right) for opt in non_string_options):
-                if len(non_string_options) + len(string_options) == len(options):
-                    return True
-            # If right has anyOf/oneOf, for each left option, there must be at least one right option that matches
-            if key in right:
-                if all(any(json_schema_is_subset(opt, r_opt) for r_opt in right[key]) for opt in options):
-                    return True
-            # Otherwise, require all options to be a subset of right
-            if all(json_schema_is_subset(opt, right) for opt in options):
-                return True
-            return False
-        if key in right:
-            # All right options must accept left (strict subset logic)
-            return all(json_schema_is_subset(left, opt) for opt in right[key])
-
-    # Compare types
+    # Superset logic for types
     left_types = normalize_type(left.get("type"))
     right_types = normalize_type(right.get("type"))
-    if left_types:
-        # If left is a subset of right, or left is more permissive (e.g., includes 'null')
-        if not left_types.issubset(right_types) and not ("null" in left_types and left_types - {"null"} == right_types):
-            return False
+    if not left_types.issuperset(right_types):
+        return False
 
-    # Handle arrays: recursively check 'items'
+    # Format: left must not be more restrictive than right
+    left_format = left.get("format")
+    right_format = right.get("format")
+    if right_format is None:
+        if left_format is not None:
+            return False
+    elif left_format != right_format:
+        return False
+
+    # Arrays: left must be a superset of right in 'items'
     if left.get("type") == "array" and right.get("type") == "array":
         left_items = left.get("items", {})
         right_items = right.get("items", {})
-        # If right_items is empty, only allow if left_items is also empty
+        # If right's items is unconstrained, left's must also be unconstrained
         if not right_items:
             return not left_items
-        # If left_items is empty but right_items is not, not a subset
-        if not left_items and right_items:
-            return False
-        # If both are non-empty, recursively check
         if not json_schema_is_subset(left_items, right_items):
             return False
 
-    # Handle objects: recursively check 'properties'
+    # Objects: left must be a superset of right in 'properties'
     if left.get("type") == "object" and right.get("type") == "object":
         left_props = left.get("properties", {})
         right_props = right.get("properties", {})
-        for prop, left_prop_schema in left_props.items():
-            right_prop_schema = right_props.get(prop)
-            if right_prop_schema is None:
+        # Left can have more properties, but must cover all right properties
+        for prop in right_props:
+            if prop not in left_props:
                 return False
-            if not json_schema_is_subset(left_prop_schema, right_prop_schema):
+            if not json_schema_is_subset(left_props[prop], right_props[prop]):
                 return False
 
-    # Strict format check: if left has a format, right must have the same format
-    left_format = left.get("format")
-    right_format = right.get("format")
-    if left_format:
-        if left_format != right_format:
-            return False
-    # If right has a format but left does not, left is not a subset
-    if right_format and not left_format:
-        return False
-    # If left has a format but right does not, that's now not allowed (already handled above)
     return True 
