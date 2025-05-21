@@ -1,0 +1,87 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.12", "3.13"]
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python-version }}
+        cache: 'uv'
+
+    - name: Install uv
+      run: |
+        curl -LsSf https://astral.sh/uv/install.sh | sh
+        echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+
+    - name: Install dependencies
+      run: |
+        uv sync --extras
+
+    - name: Run tests
+      run: |
+        uv run pytest tests/ --cov=src/fastdataframe --cov-report=xml --junitxml=junit/test-results-${{ matrix.python-version }}.xml
+
+    - name: Upload test results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: test-results-${{ matrix.python-version }}
+        path: |
+          junit/test-results-${{ matrix.python-version }}.xml
+          coverage.xml
+
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v4
+      with:
+        file: ./coverage.xml
+        fail_ci_if_error: true
+
+  build:
+    needs: test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.12"
+        cache: 'uv'
+
+    - name: Install uv
+      run: |
+        curl -LsSf https://astral.sh/uv/install.sh | sh
+        echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+
+    - name: Install build dependencies
+      run: |
+        uv sync
+        
+    - name: Build wheel
+      run: |
+        source .venv/bin/activate
+        uv build
+
+    - name: Upload wheel artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: wheel
+        path: dist/*.whl 
