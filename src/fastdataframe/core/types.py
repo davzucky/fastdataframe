@@ -21,6 +21,35 @@ def get_union_options(schema):
             return schema[k]
     return None
 
+def array_schema_is_subset(left: dict, right: dict) -> bool:
+    """
+    Returns True if the left array schema is a superset of the right array schema.
+    - If right's items is unconstrained, left's must also be unconstrained.
+    - Otherwise, left's items must be a superset of right's items.
+    """
+    left_items = left.get("items", {})
+    right_items = right.get("items", {})
+    if not right_items:
+        return not left_items
+    return json_schema_is_subset(left_items, right_items)
+
+
+def object_schema_is_subset(left: dict, right: dict) -> bool:
+    """
+    Returns True if the left object schema is a superset of the right object schema.
+    - Left can have more properties, but must cover all right properties.
+    - Each left property must be a superset of the right property.
+    """
+    left_props = left.get("properties", {})
+    right_props = right.get("properties", {})
+    for prop in right_props:
+        if prop not in left_props:
+            return False
+        if not json_schema_is_subset(left_props[prop], right_props[prop]):
+            return False
+    return True
+
+
 def json_schema_is_subset(left: dict, right: dict) -> bool:
     """
     Returns True if the left JSON schema is a superset of the right schema (i.e., all values valid under right are also valid under left).
@@ -87,23 +116,10 @@ def json_schema_is_subset(left: dict, right: dict) -> bool:
 
     # --- Array Handling ---
     if left.get("type") == "array" and right.get("type") == "array":
-        left_items = left.get("items", {})
-        right_items = right.get("items", {})
-        # If right's items is unconstrained, left's must also be unconstrained
-        if not right_items:
-            return not left_items
-        if not json_schema_is_subset(left_items, right_items):
-            return False
+        return array_schema_is_subset(left, right)
 
     # --- Object Handling ---
     if left.get("type") == "object" and right.get("type") == "object":
-        left_props = left.get("properties", {})
-        right_props = right.get("properties", {})
-        # Left can have more properties, but must cover all right properties
-        for prop in right_props:
-            if prop not in left_props:
-                return False
-            if not json_schema_is_subset(left_props[prop], right_props[prop]):
-                return False
+        return object_schema_is_subset(left, right)
 
     return True 
