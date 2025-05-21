@@ -4,6 +4,9 @@ import polars as pl
 from fastdataframe.polars.model import PolarsFastDataframeModel
 from fastdataframe.core.model import FastDataframeModel
 from typing import Optional
+import pytest
+import datetime as dt
+import isodate
 
 def test_polars_availability():
     """Test that polars package is available and can be imported."""
@@ -137,4 +140,53 @@ def test_validate_schema_valid_frame():
     lazy_frame = pl.LazyFrame({"field1": [1, 2, 3], "field2": ["a", "b", "c"]})
 
     errors = TestModel.validate_schema(lazy_frame)
-    assert len(errors) == 0 
+    assert len(errors) == 0
+
+@pytest.mark.parametrize(
+    "dtype_str,expected",
+    [
+        ("Int64", "integer"),
+        ("Float64", "number"),
+        ("String", "string"),
+        ("Boolean", "boolean"),
+        ("Date", "date"),
+        ("Datetime", "datetime"),
+        ("Time", "time"),
+        ("Duration", "timedelta"),
+        ("UnknownType", "UnknownType"),
+    ]
+)
+def test_polars_dtype_to_json_schema_types(dtype_str, expected):
+    """Test mapping of Polars dtypes to JSON schema types (parametrized)."""
+    from fastdataframe.polars.model import PolarsFastDataframeModel
+    class DummyDtype:
+        def __init__(self, s):
+            self.s = s
+        def __str__(self):
+            return self.s
+    assert PolarsFastDataframeModel._polars_dtype_to_json_schema(DummyDtype(dtype_str)) == expected 
+
+def test_polarsfastdataframemodel_with_temporal_types():
+    """Test PolarsFastDataframeModel schema validation with date, datetime, time, and timedelta fields."""
+    class TemporalModel(FastDataframeModel):
+        d: dt.date
+        dt_: dt.datetime
+        t: dt.time
+        td: dt.timedelta
+
+    PolarsModel = PolarsFastDataframeModel.from_fastdataframe_model(TemporalModel)
+
+    today = dt.date.today()
+    now = dt.datetime.now()
+    t = now.time()
+    td_ = dt.timedelta(days=1, hours=2)
+
+    # Use ISO 8601 duration string for timedelta
+    frame = pl.LazyFrame({
+        "d": [today.isoformat(), today.isoformat()],
+        "dt_": [now.isoformat(), now.isoformat()],
+        "t": [t.isoformat(), t.isoformat()],
+        "td": [isodate.duration_isoformat(td_), isodate.duration_isoformat(td_)],
+    })
+    errors = PolarsModel.validate_schema(frame)
+    assert len(errors) == 0, f"Temporal types frame should not have validation errors, got: {errors}" 
