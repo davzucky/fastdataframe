@@ -3,10 +3,46 @@
 from fastdataframe.core.model import FastDataframeModel
 from fastdataframe.core.validation import ValidationError
 import polars as pl
+from typing import Type, TypeVar
 
+T = TypeVar("T", bound="PolarsFastDataframeModel")
 
 class PolarsFastDataframeModel(FastDataframeModel):
     """A model that extends FastDataframeModel for Polars integration."""
+
+    @classmethod
+    def from_fastdataframe_model(cls: Type[T], model: FastDataframeModel) -> Type[T]:
+        """Convert any FastDataframeModel to a PolarsFastDataframeModel.
+        
+        This method creates a new class that inherits from PolarsFastDataframeModel
+        with the same fields and annotations as the input model.
+        
+        Args:
+            model: The FastDataframeModel to convert
+            
+        Returns:
+            A new class that inherits from PolarsFastDataframeModel with the same fields
+            
+        Example:
+            ```python
+            class MyModel(FastDataframeModel):
+                field1: int
+                field2: str
+                
+            # Convert to PolarsFastDataframeModel
+            PolarsModel = PolarsFastDataframeModel.from_fastdataframe_model(MyModel)
+            ```
+        """
+        # Create a new class that inherits from PolarsFastDataframeModel
+        # with the same fields and annotations as the input model
+        return type(
+            f"{model.__name__}Polars",
+            (cls,),
+            {
+                "__annotations__": model.__annotations__,
+                "__doc__": f"Polars version of {model.__name__}",
+            }
+        )
 
     @classmethod
     def _validate_missing_columns(cls, model_schema: dict, frame_schema: dict) -> dict[str, ValidationError]:
