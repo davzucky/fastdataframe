@@ -1,4 +1,3 @@
-
 from typing import Annotated, Any, Dict, List, Optional, Union
 
 import pytest
@@ -59,7 +58,7 @@ from fastdataframe.core.types_helper import is_optional_type
         (Annotated[Union[List[int], None], "metadata"], True),
     ],
 )
-def test_is_optional_type(field_type: Any, expected: bool):
+def test_is_optional_type(field_type: Any, expected: bool) -> None:
     """Test the is_optional_type function with various type hints.
     
     Args:

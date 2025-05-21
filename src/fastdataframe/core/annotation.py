@@ -1,7 +1,7 @@
 """Annotation classes for FastDataframe."""
 
 from dataclasses import dataclass, replace
-from typing import Any, Optional, Self
+from typing import Any, Optional, Self, cast
 from pydantic._internal._fields import PydanticMetadata
 from annotated_types import BaseMetadata
 from .types_helper import is_optional_type
@@ -34,7 +34,7 @@ class FastDataframe(PydanticMetadata, BaseMetadata):
         Returns:
             A dictionary containing the schema with our metadata
         """
-        schema = handler(source_type)
+        schema = cast(dict[str, Any], handler(source_type))
         # Add both the properties and a reconstruction document
         schema['json_schema_extra'] = {
             'is_nullable': self.is_nullable,
@@ -64,7 +64,7 @@ class FastDataframe(PydanticMetadata, BaseMetadata):
         Returns:
             A dictionary containing the JSON schema with our metadata
         """
-        json_schema = handler(core_schema)
+        json_schema = cast(dict[str, Any], handler(core_schema))
         if 'json_schema_extra' in core_schema:
             json_schema.update(core_schema['json_schema_extra'])
         return json_schema

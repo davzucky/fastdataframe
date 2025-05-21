@@ -8,7 +8,7 @@ import pytest
 import datetime as dt
 import isodate
 
-def test_polars_availability():
+def test_polars_availability() -> None:
     """Test that polars package is available and can be imported."""
     try:
         import polars
@@ -22,7 +22,7 @@ class TestModel(PolarsFastDataframeModel):
     field1: int
     field2: str
 
-def test_from_fastdataframe_model_basic_conversion():
+def test_from_fastdataframe_model_basic_conversion() -> None:
     """Test basic conversion of FastDataframeModel to PolarsFastDataframeModel."""
     # Create a base model
     class BaseModel(FastDataframeModel):
@@ -47,7 +47,7 @@ def test_from_fastdataframe_model_basic_conversion():
     # Verify the docstring is updated
     assert PolarsModel.__doc__ == "Polars version of BaseModel"
 
-def test_from_fastdataframe_model_valid_frame():
+def test_from_fastdataframe_model_valid_frame() -> None:
     """Test validation of a valid frame with the converted model."""
     class BaseModel(FastDataframeModel):
         name: str
@@ -67,7 +67,7 @@ def test_from_fastdataframe_model_valid_frame():
     errors = PolarsModel.validate_schema(valid_frame)
     assert len(errors) == 0, "Valid frame should not have validation errors"
 
-def test_from_fastdataframe_model_missing_optional():
+def test_from_fastdataframe_model_missing_optional() -> None:
     """Test validation of a frame missing an optional field."""
     class BaseModel(FastDataframeModel):
         name: str
@@ -87,7 +87,7 @@ def test_from_fastdataframe_model_missing_optional():
     errors = PolarsModel.validate_schema(invalid_frame)
     assert len(errors) == 0, "Frame missing optional field should not have validation errors"
 
-def test_from_fastdataframe_model_type_mismatch():
+def test_from_fastdataframe_model_type_mismatch() -> None:
     """Test validation of a frame with type mismatches."""
     class BaseModel(FastDataframeModel):
         name: str
@@ -112,7 +112,7 @@ def test_from_fastdataframe_model_type_mismatch():
     assert error_types["age"] == "TypeMismatch"
     assert error_types["score"] == "TypeMismatch"
 
-def test_validate_missing_columns():
+def test_validate_missing_columns() -> None:
     """Test that validate_schema correctly identifies missing columns."""
     # Create a lazy frame missing 'field2'
     lazy_frame = pl.LazyFrame({"field1": [1, 2, 3]})
@@ -123,7 +123,7 @@ def test_validate_missing_columns():
     assert errors[0].error_type == "MissingColumn"
     assert errors[0].error_details == "Column field2 is missing in the frame."
 
-def test_validate_column_types():
+def test_validate_column_types() -> None:
     """Test that validate_schema correctly identifies type mismatches."""
     # Create a lazy frame with incorrect type for 'field1'
     lazy_frame = pl.LazyFrame({"field1": ["1", "2", "3"], "field2": ["a", "b", "c"]})
@@ -134,7 +134,7 @@ def test_validate_column_types():
     assert errors[0].error_type == "TypeMismatch"
     assert errors[0].error_details == "Expected type integer, but got string."
 
-def test_validate_schema_valid_frame():
+def test_validate_schema_valid_frame() -> None:
     """Test that validate_schema returns no errors for a valid frame."""
     # Create a valid lazy frame
     lazy_frame = pl.LazyFrame({"field1": [1, 2, 3], "field2": ["a", "b", "c"]})
@@ -156,17 +156,17 @@ def test_validate_schema_valid_frame():
         ("UnknownType", "UnknownType"),
     ]
 )
-def test_polars_dtype_to_json_schema_types(dtype_str, expected):
+def test_polars_dtype_to_json_schema_types(dtype_str: str, expected: str) -> None:
     """Test mapping of Polars dtypes to JSON schema types (parametrized)."""
     from fastdataframe.polars.model import PolarsFastDataframeModel
     class DummyDtype:
-        def __init__(self, s):
+        def __init__(self, s: str):
             self.s = s
-        def __str__(self):
+        def __str__(self) -> str:
             return self.s
-    assert PolarsFastDataframeModel._polars_dtype_to_json_schema(DummyDtype(dtype_str)) == expected 
+    assert PolarsFastDataframeModel._polars_dtype_to_json_schema(DummyDtype(dtype_str)) == expected  # type: ignore[arg-type]
 
-def test_polarsfastdataframemodel_with_temporal_types():
+def test_polarsfastdataframemodel_with_temporal_types() -> None:
     """Test PolarsFastDataframeModel schema validation with date, datetime, time, and timedelta fields."""
     class TemporalModel(FastDataframeModel):
         d: dt.date

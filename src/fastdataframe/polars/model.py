@@ -11,7 +11,7 @@ class PolarsFastDataframeModel(FastDataframeModel):
     """A model that extends FastDataframeModel for Polars integration."""
 
     @classmethod
-    def from_fastdataframe_model(cls: Type[T], model: FastDataframeModel) -> Type[T]:
+    def from_fastdataframe_model(cls: Type[T], model: type[FastDataframeModel]) -> Type[T]:
         """Convert any FastDataframeModel to a PolarsFastDataframeModel.
         
         This method creates a new class that inherits from PolarsFastDataframeModel
@@ -59,7 +59,7 @@ class PolarsFastDataframeModel(FastDataframeModel):
         return errors
 
     @staticmethod
-    def _polars_dtype_to_json_schema(dtype) -> str:
+    def _polars_dtype_to_json_schema(dtype: pl.DataType) -> str:
         """Map Polars dtype to JSON schema type string."""
         dtype_str = str(dtype)
         if dtype_str.startswith("Int"):
@@ -70,6 +70,14 @@ class PolarsFastDataframeModel(FastDataframeModel):
             return "string"
         if dtype_str == "Boolean":
             return "boolean"
+        if dtype_str == "Date":
+            return "date"
+        if dtype_str == "Datetime":
+            return "datetime"
+        if dtype_str == "Time":
+            return "time"
+        if dtype_str == "Duration":
+            return "timedelta"
         return dtype_str  # fallback for unknown types
 
     @classmethod
@@ -86,7 +94,7 @@ class PolarsFastDataframeModel(FastDataframeModel):
                     expected_types = [expected_type] if expected_type is not None else []
                 actual_type = cls._polars_dtype_to_json_schema(frame_schema[field_name])
                 is_nullable = fastdataframe_annotations.get(field_name, None)
-                is_nullable = is_nullable.is_nullable if is_nullable is not None else False
+                is_nullable_flag = is_nullable.is_nullable if is_nullable is not None else False
                 if actual_type in expected_types:
                     continue
                 errors[field_name] = ValidationError(

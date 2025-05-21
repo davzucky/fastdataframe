@@ -44,6 +44,7 @@ warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = true
 disallow_incomplete_defs = true
+ignore_missing_imports = false
 
 [dependency-groups]
 dev = [
@@ -51,6 +52,7 @@ dev = [
     "mypy>=1.9.0",
     "ruff>=0.11.10",
     "pytest-cov>=6.1.1",
+    "isodate>=0.7.2",
 ]
 
 [tool.hatch.build]
@@ -61,4 +63,10 @@ packages = ["src/fastdataframe"]
 
 [tool.pytest.ini_options]
 pythonpath = ["src/"]
+
+[[tool.mypy.overrides]]
+module = [
+    "isodate",
+]
+ignore_missing_imports = true
 

@@ -51,7 +51,7 @@ from fastdataframe.core.annotation import FastDataframe
         (Annotated[Optional[str], Field()], True, False),
     ],
 )
-def test_model_base_type(field_type: Any, expected_is_nullable: bool, expected_is_unique: bool):
+def test_model_base_type(field_type: Any, expected_is_nullable: bool, expected_is_unique: bool) -> None:
     """Test that model fields have correct is_nullable and is_unique properties based on their type.
     
     Args:
@@ -74,7 +74,7 @@ def test_model_base_type(field_type: Any, expected_is_nullable: bool, expected_i
     assert fastdataframe_props["is_nullable"] is expected_is_nullable
     assert fastdataframe_props["is_unique"] is expected_is_unique
     
-def test_get_fastdataframe_annotations():
+def test_get_fastdataframe_annotations() -> None:
     """Test that get_fastdataframe_annotations returns a dictionary mapping field_name to FastDataframe annotation objects."""
     class MyModel(FastDataframeModel):
         field1: int

@@ -36,10 +36,11 @@ class FastDataframeModelMetaclass(PydanticModelMetaclass):
                 new_class_dict["__annotations__"][field_name] = Annotated[
                     field_type, FastDataframe.from_field_type(field_type)
                 ]
-            elif origin is Annotated and contains_type(args, FastDataframe):
+            elif origin is Annotated and contains_type(list(args), FastDataframe):
                 fastdataframe_item = get_item_of_type(args, FastDataframe)
-                temp_args = filter_type(args, FastDataframe)
-                temp_args.append(fastdataframe_item.set_is_nullable_from_type(args[0]))
+                temp_args = filter_type(list(args), FastDataframe)
+                if fastdataframe_item is not None:
+                    temp_args.append(fastdataframe_item.set_is_nullable_from_type(args[0]))
                 new_class_dict["__annotations__"][field_name] = Annotated[tuple(temp_args)]
             else:
                 new_class_dict["__annotations__"][field_name] = Annotated[args + (FastDataframe.from_field_type(args[0]),)]            # else:
