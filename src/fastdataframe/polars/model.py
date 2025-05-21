@@ -22,6 +22,7 @@ class PolarsFastDataframeModel(FastDataframeModel):
         frame_schema = lazy_frame.collect_schema()
         errors = {}
 
+        # Validate missing columns
         for field_name, field_schema in model_schema.get("properties", {}).items():
             if field_name not in frame_schema:
                 error = errors.get(field_name, ValidationError(
@@ -30,6 +31,18 @@ class PolarsFastDataframeModel(FastDataframeModel):
                     error_details=f"Column {field_name} is missing in the frame."
                 ))
                 errors[field_name] = error
-                
-            # Add additional validation logic here if needed
-        return errors 
+
+        # Validate column types
+        for field_name, field_schema in model_schema.get("properties", {}).items():
+            if field_name in frame_schema:
+                expected_type = field_schema.get("type")
+                actual_type = frame_schema[field_name].dtype
+                if expected_type != actual_type:
+                    error = errors.get(field_name, ValidationError(
+                        column_name=field_name,
+                        error_type="TypeMismatch",
+                        error_details=f"Expected type {expected_type}, but got {actual_type}."
+                    ))
+                    errors[field_name] = error
+
+        return list(errors.values()) 
