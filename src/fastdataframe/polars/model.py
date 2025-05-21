@@ -46,18 +46,11 @@ class PolarsFastDataframeModel(FastDataframeModel):
 
     @classmethod
     def _validate_missing_columns(cls, model_schema: dict, frame_schema: dict) -> dict[str, ValidationError]:
-        """Validate if all required columns are present in the frame.
-
-        Args:
-            model_schema: The model's JSON schema.
-            frame_schema: The frame's schema.
-
-        Returns:
-            dict[str, ValidationError]: A dictionary of validation errors.
-        """
+        """Validate if all required columns are present in the frame, using FastDataframe.is_nullable."""
         errors = {}
-        for field_name in model_schema.get("properties", {}):
-            if field_name not in frame_schema:
+        fastdataframe_annotations = cls.get_fastdataframe_annotations()
+        for field_name, annotation in fastdataframe_annotations.items():
+            if not annotation.is_nullable and field_name not in frame_schema:
                 errors[field_name] = ValidationError(
                     column_name=field_name,
                     error_type="MissingColumn",
@@ -81,26 +74,26 @@ class PolarsFastDataframeModel(FastDataframeModel):
 
     @classmethod
     def _validate_column_types(cls, model_schema: dict, frame_schema: dict) -> dict[str, ValidationError]:
-        """Validate if column types match the expected types.
-
-        Args:
-            model_schema: The model's JSON schema.
-            frame_schema: The frame's schema.
-
-        Returns:
-            dict[str, ValidationError]: A dictionary of validation errors.
-        """
+        """Validate if column types match the expected types, using FastDataframe.is_nullable."""
         errors = {}
+        fastdataframe_annotations = cls.get_fastdataframe_annotations()
         for field_name, field_schema in model_schema.get("properties", {}).items():
             if field_name in frame_schema:
-                expected_type = field_schema.get("type")
+                if "anyOf" in field_schema:
+                    expected_types = [subschema.get("type") for subschema in field_schema["anyOf"] if "type" in subschema]
+                else:
+                    expected_type = field_schema.get("type")
+                    expected_types = [expected_type] if expected_type is not None else []
                 actual_type = cls._polars_dtype_to_json_schema(frame_schema[field_name])
-                if expected_type != actual_type:
-                    errors[field_name] = ValidationError(
-                        column_name=field_name,
-                        error_type="TypeMismatch",
-                        error_details=f"Expected type {expected_type}, but got {actual_type}."
-                    )
+                is_nullable = fastdataframe_annotations.get(field_name, None)
+                is_nullable = is_nullable.is_nullable if is_nullable is not None else False
+                if actual_type in expected_types:
+                    continue
+                errors[field_name] = ValidationError(
+                    column_name=field_name,
+                    error_type="TypeMismatch",
+                    error_details=f"Expected type {' or '.join(expected_types)}, but got {actual_type}."
+                )
         return errors
 
     @classmethod
