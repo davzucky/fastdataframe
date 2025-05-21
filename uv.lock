@@ -84,7 +84,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "annotated-types", specifier = ">=0.5.0" },
-    { name = "polars", marker = "extra == 'polars'", specifier = ">=1.29.0" },
+    { name = "polars", marker = "extra == 'polars'", specifier = ">=1.26.0" },
     { name = "pydantic", specifier = ">=2.0.0" },
 ]
 provides-extras = ["polars"]
