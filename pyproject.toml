@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "fastdataframe"
-version = "0.1.0"
+version = "0.0.1"
 description = "A fast dataframe implementation with Pydantic integration"
 readme = "README.md"
 requires-python = ">=3.12"
@@ -15,13 +15,10 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = [
-    "pytest>=7.0.0",
-    "pytest-cov>=4.0.0",
-    "black>=23.0.0",
-    "isort>=5.0.0",
-    "mypy>=1.0.0",
+polars = [
+    "polars>=1.29.0",
 ]
+
 
 [tool.black]
 line-length = 88
