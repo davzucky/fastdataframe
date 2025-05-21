@@ -8,6 +8,9 @@ def json_schema_is_subset(left: dict, right: dict) -> bool:
     - nullability (e.g., Optional types)
     - arrays and objects (recursively checks 'items' and 'properties')
     """
+    # Early return for identical schemas
+    if left == right:
+        return True
     def normalize_type(t):
         if isinstance(t, list):
             return set(t)
