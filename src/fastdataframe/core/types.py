@@ -24,12 +24,23 @@ def get_union_options(schema):
 def json_schema_is_subset(left: dict, right: dict) -> bool:
     """
     Returns True if the left JSON schema is a superset of the right schema (i.e., all values valid under right are also valid under left).
-    Handles:
-    - 'type' (including list of types)
-    - 'format' (for temporal types)
-    - 'anyOf'/'oneOf' (recursively, superset logic)
-    - nullability (e.g., Optional types)
-    - arrays and objects (recursively checks 'items' and 'properties')
+
+    Subset Logic Details:
+    - 'type': Left type set must be a superset of right type set.
+    - 'format': If right has a format, left must have the same format. If right does not have a format, left must not be more restrictive (i.e., left must not have a format).
+    - 'anyOf'/'oneOf' (Unions):
+        * If right is a union: For every right option, there must be a left option that is a superset of it.
+        * If left is a union and right is not: If any left option is a superset of right, return True. (Covers optionals, e.g., Optional[int] vs int, and permissive unions like float|int vs int.)
+    - Optionals: Handled as unions with 'null' type. E.g., Optional[int] is {'anyOf': [{'type': 'integer'}, {'type': 'null'}]}.
+    - Decimals: Often represented as unions (e.g., {'anyOf': [{'type': 'number'}, {'type': 'string'}]}). Subset logic for unions applies.
+    - Arrays: If right's items is unconstrained, left's must also be unconstrained. Otherwise, left's items must be a superset of right's items.
+    - Objects: Left can have more properties, but must cover all right properties, and each left property must be a superset of the right property.
+
+    Args:
+        left (dict): The candidate superset JSON schema.
+        right (dict): The candidate subset JSON schema.
+    Returns:
+        bool: True if left is a superset of right, False otherwise.
     """
     # Early return for identical schemas
     if left == right:
@@ -42,27 +53,30 @@ def json_schema_is_subset(left: dict, right: dict) -> bool:
     left_union = get_union_options(left)
     right_union = get_union_options(right)
 
-    # Superset logic for unions (anyOf/oneOf)
+    # --- Union/anyOf/oneOf Handling ---
+    # If right is a union: For every right option, there must be a left option that is a superset of it.
     if right_union is not None:
-        if left_union is None:
-            # Left must cover all right options
-            return all(json_schema_is_subset(left, r_opt) for r_opt in right_union)
-        # For each right option, there must be a left option that is a superset
         for r_opt in right_union:
-            if not any(json_schema_is_subset(l_opt, r_opt) for l_opt in left_union):
-                return False
+            if left_union is None:
+                # Left must cover all right options
+                if not json_schema_is_subset(left, r_opt):
+                    return False
+            else:
+                # For each right option, there must be a left option that is a superset
+                if not any(json_schema_is_subset(l_opt, r_opt) for l_opt in left_union):
+                    return False
         return True
+    # If left is a union and right is not: If any left option is a superset of right, return True.
     elif left_union is not None:
-        # Left is a union, right is not: left is a superset if any left option is a superset of right
         return any(json_schema_is_subset(l_opt, right) for l_opt in left_union)
 
-    # Superset logic for types
+    # --- Type Handling ---
     left_types = normalize_type(left.get("type"))
     right_types = normalize_type(right.get("type"))
     if not left_types.issuperset(right_types):
         return False
 
-    # Format: left must not be more restrictive than right
+    # --- Format Handling ---
     left_format = left.get("format")
     right_format = right.get("format")
     if right_format is None:
@@ -71,7 +85,7 @@ def json_schema_is_subset(left: dict, right: dict) -> bool:
     elif left_format != right_format:
         return False
 
-    # Arrays: left must be a superset of right in 'items'
+    # --- Array Handling ---
     if left.get("type") == "array" and right.get("type") == "array":
         left_items = left.get("items", {})
         right_items = right.get("items", {})
@@ -81,7 +95,7 @@ def json_schema_is_subset(left: dict, right: dict) -> bool:
         if not json_schema_is_subset(left_items, right_items):
             return False
 
-    # Objects: left must be a superset of right in 'properties'
+    # --- Object Handling ---
     if left.get("type") == "object" and right.get("type") == "object":
         left_props = left.get("properties", {})
         right_props = right.get("properties", {})
