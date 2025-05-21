@@ -14,6 +14,7 @@ def test_polars_availability():
         raise ImportError("Polars package is not available. Please install it using 'pip install polars'") from e
 
 class TestModel(PolarsFastDataframeModel):
+    __test__ = False
     """Test model for validation tests."""
     field1: int
     field2: str
