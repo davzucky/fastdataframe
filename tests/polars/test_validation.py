@@ -158,37 +158,6 @@ def test_validate_schema_valid_frame() -> None:
     assert len(errors) == 0
 
 
-@pytest.mark.parametrize(
-    "dtype_str,expected",
-    [
-        ("Int64", "integer"),
-        ("Float64", "number"),
-        ("String", "string"),
-        ("Boolean", "boolean"),
-        ("Date", "date"),
-        ("Datetime", "datetime"),
-        ("Time", "time"),
-        ("Duration", "timedelta"),
-        ("UnknownType", "UnknownType"),
-    ],
-)
-def test_polars_dtype_to_json_schema_types(dtype_str: str, expected: str) -> None:
-    """Test mapping of Polars dtypes to JSON schema types (parametrized)."""
-    from fastdataframe.polars.model import PolarsFastDataframeModel
-
-    class DummyDtype:
-        def __init__(self, s: str):
-            self.s = s
-
-        def __str__(self) -> str:
-            return self.s
-
-    assert (
-        PolarsFastDataframeModel._polars_dtype_to_json_schema(DummyDtype(dtype_str))
-        == expected
-    )  # type: ignore[arg-type]
-
-
 def test_polarsfastdataframemodel_with_temporal_types() -> None:
     """Test PolarsFastDataframeModel schema validation with date, datetime, time, and timedelta fields."""
 

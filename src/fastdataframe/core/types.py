@@ -5,7 +5,7 @@ logger = logging.getLogger(__name__)
 
 
 # Helper: normalize type field to a set
-def normalize_type(t: Any) -> set:
+def normalize_type(t: Any) -> set[Any]:
     if isinstance(t, list):
         return set(t)
     if t is None:
@@ -16,7 +16,7 @@ def normalize_type(t: Any) -> set:
 def get_type_name(t: dict[str, Any]) -> str:
     if "anyOf" in t or "oneOf" in t:
         return f"union[{', '.join([get_type_name(o) for o in t.get('anyOf', t.get('oneOf', []))])}]"
-    return t.get("format", t.get("type"))
+    return str(t.get("format", t.get("type")))
 
 
 # Helper: filter out ignorable types from a list of options
@@ -114,7 +114,7 @@ def object_schema_is_subset(left: dict, right: dict) -> bool:
     return True
 
 
-def format_is_superset(left: dict, right: dict) -> bool:
+def format_is_superset(left: dict[str, Any], right: dict[str, Any]) -> bool:
     """
     Returns True if the left format is a superset of the right format.
     - If right has a format, left must have the same format.
@@ -128,7 +128,8 @@ def format_is_superset(left: dict, right: dict) -> bool:
         return left_format is None
     if left_format != right_format:
         logger.debug(f"Format fail: left {left_format} != right {right_format}")
-    return left_format == right_format
+        return False
+    return True
 
 
 def json_schema_is_subset(left: dict, right: dict) -> bool:
