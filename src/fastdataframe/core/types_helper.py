@@ -2,12 +2,13 @@
 
 from typing import Any, Iterable, Optional, Type, get_origin, get_args, Annotated, Union
 
+
 def is_optional_type(field_type: Any) -> bool:
     """Check if a type is optional (can be None).
-    
+
     Args:
         field_type: The type to check
-        
+
     Returns:
         bool: True if the type is optional, False otherwise
     """
@@ -23,15 +24,16 @@ def is_optional_type(field_type: Any) -> bool:
         return type(None) in args
 
     # Handle direct None type
-    return field_type is type(None) 
+    return field_type is type(None)
+
 
 def contains_type(list_args: list[Any], type: Type) -> bool:
     """Check if a list contains a specific type.
-    
+
     Args:
         list_args: The list to check
         type: The type to check for
-        
+
     Returns:
         bool: True if the list contains the type, False otherwise
     """
@@ -40,13 +42,14 @@ def contains_type(list_args: list[Any], type: Type) -> bool:
             return True
     return False
 
+
 def filter_type(list_args: Iterable[Any], type: Type) -> list[Any]:
     """Check if a list contains a specific type.
-    
+
     Args:
         list_args: The list to check
         type: The type to check for
-        
+
     Returns:
         bool: True if the list contains the type, False otherwise
     """
@@ -56,13 +59,14 @@ def filter_type(list_args: Iterable[Any], type: Type) -> list[Any]:
             result.append(arg)
     return result
 
+
 def get_item_of_type(list_args: Iterable[Any], type: Type) -> Optional[Any]:
     """Check if a list contains a specific type.
-    
+
     Args:
         list_args: The list to check
         type: The type to check for
-        
+
     Returns:
         bool: True if the list contains the type, False otherwise
     """

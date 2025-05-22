@@ -1,1 +1,1 @@
-"""Test package for FastDataframe.""" 
+"""Test package for FastDataframe."""

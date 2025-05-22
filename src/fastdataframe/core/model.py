@@ -12,6 +12,7 @@ from .types_helper import contains_type, filter_type, get_item_of_type
 
 T = TypeVar("T", bound="FastDataframeModel")
 
+
 class FastDataframeModelMetaclass(PydanticModelMetaclass):
     """Metaclass that enforces FastDataframe metadata on all fields."""
 
@@ -40,18 +41,22 @@ class FastDataframeModelMetaclass(PydanticModelMetaclass):
                 fastdataframe_item = get_item_of_type(args, FastDataframe)
                 temp_args = filter_type(list(args), FastDataframe)
                 if fastdataframe_item is not None:
-                    temp_args.append(fastdataframe_item.set_is_nullable_from_type(args[0]))
-                new_class_dict["__annotations__"][field_name] = Annotated[tuple(temp_args)]
+                    temp_args.append(
+                        fastdataframe_item.set_is_nullable_from_type(args[0])
+                    )
+                new_class_dict["__annotations__"][field_name] = Annotated[
+                    tuple(temp_args)
+                ]
             else:
-                new_class_dict["__annotations__"][field_name] = Annotated[args + (FastDataframe.from_field_type(args[0]),)]            # else:
+                new_class_dict["__annotations__"][field_name] = Annotated[
+                    args + (FastDataframe.from_field_type(args[0]),)
+                ]  # else:
 
         return super().__new__(mcs, name, bases, new_class_dict, **kwargs)
 
 
-
 class FastDataframeModel(BaseModel, metaclass=FastDataframeModelMetaclass):
     """Base model that enforces FastDataframe annotation on all fields."""
-
 
     @classmethod
     def get_fastdataframe_annotations(cls) -> dict[str, FastDataframe]:
@@ -61,6 +66,7 @@ class FastDataframeModel(BaseModel, metaclass=FastDataframeModelMetaclass):
         for field_name, field_schema in schema.get("properties", {}).items():
             fastdataframe_doc = field_schema.get("_fastdataframe")
             if fastdataframe_doc:
-                fastdataframes[field_name] = FastDataframe.from_schema({"json_schema_extra": {"_fastdataframe": fastdataframe_doc}})
+                fastdataframes[field_name] = FastDataframe.from_schema(
+                    {"json_schema_extra": {"_fastdataframe": fastdataframe_doc}}
+                )
         return fastdataframes
-

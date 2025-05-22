@@ -3,6 +3,7 @@ from typing import Any
 
 logger = logging.getLogger(__name__)
 
+
 # Helper: normalize type field to a set
 def normalize_type(t: Any) -> set:
     if isinstance(t, list):
@@ -11,13 +12,22 @@ def normalize_type(t: Any) -> set:
         return set()
     return {t}
 
+
+def get_type_name(t: dict[str, Any]) -> str:
+    if "anyOf" in t or "oneOf" in t:
+        return f"union[{', '.join([get_type_name(o) for o in t.get('anyOf', t.get('oneOf', []))])}]"
+    return t.get("format", t.get("type"))
+
+
 # Helper: filter out ignorable types from a list of options
 def filter_options(options: list[dict], ignorable_types: set) -> list[dict]:
     return [opt for opt in options if opt.get("type") not in ignorable_types]
 
+
 # Helper: check if schema is a union (anyOf/oneOf)
 def is_union(schema: dict) -> bool:
     return any(k in schema for k in ("anyOf", "oneOf"))
+
 
 # Helper: get union options from schema
 def get_union_options(schema: dict) -> Any:
@@ -25,6 +35,7 @@ def get_union_options(schema: dict) -> Any:
         if k in schema:
             return schema[k]
     return None
+
 
 def constraints_are_superset(left: dict, right: dict, keys: list[str]) -> bool:
     """
@@ -57,7 +68,9 @@ def constraints_are_superset(left: dict, right: dict, keys: list[str]) -> bool:
                 return False
         elif key == "uniqueItems":
             if r is False and l is not False:
-                logger.debug(f"Constraint fail: uniqueItems: right is False, left is not False")
+                logger.debug(
+                    f"Constraint fail: uniqueItems: right is False, left is not False"
+                )
                 return False
     return True
 
@@ -69,7 +82,9 @@ def array_schema_is_subset(left: dict, right: dict) -> bool:
     - Otherwise, left's items must be a superset of right's items.
     - Checks array constraints: minItems, maxItems, uniqueItems
     """
-    if not constraints_are_superset(left, right, ["minItems", "maxItems", "uniqueItems"]):
+    if not constraints_are_superset(
+        left, right, ["minItems", "maxItems", "uniqueItems"]
+    ):
         logger.debug("Array constraint check failed.")
         return False
     left_items = left.get("items", {})
@@ -174,11 +189,17 @@ def json_schema_is_subset(left: dict, right: dict) -> bool:
     left_types = normalize_type(left.get("type"))
     right_types = normalize_type(right.get("type"))
     if not left_types.issuperset(right_types):
-        logger.debug(f"Type fail: left {left_types} is not a superset of right {right_types}")
+        logger.debug(
+            f"Type fail: left {left_types} is not a superset of right {right_types}"
+        )
         return False
 
     # --- Numeric Constraints ---
-    if not constraints_are_superset(left, right, ["minimum", "maximum", "exclusiveMinimum", "exclusiveMaximum", "multipleOf"]):
+    if not constraints_are_superset(
+        left,
+        right,
+        ["minimum", "maximum", "exclusiveMinimum", "exclusiveMaximum", "multipleOf"],
+    ):
         logger.debug("Numeric constraint check failed.")
         return False
 
@@ -199,4 +220,4 @@ def json_schema_is_subset(left: dict, right: dict) -> bool:
     if left.get("type") == "object" and right.get("type") == "object":
         return object_schema_is_subset(left, right)
 
-    return True 
+    return True
