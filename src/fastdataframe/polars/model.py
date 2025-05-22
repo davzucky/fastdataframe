@@ -10,11 +10,11 @@ from pydantic import TypeAdapter
 T = TypeVar("T", bound="PolarsFastDataframeModel")
 
 
-def _extract_polars_frame_json_schema(lazy_frame: pl.LazyFrame) -> dict[str, dict]:
+def _extract_polars_frame_json_schema(frame: pl.LazyFrame | pl.DataFrame) -> dict[str, dict]:
     """
-    Given a Polars LazyFrame, return a dict mapping column names to JSON schema dicts using TypeAdapter.
+    Given a Polars LazyFrame or DataFrame, return a dict mapping column names to JSON schema dicts using TypeAdapter.
     """
-    python_types = lazy_frame.collect_schema().to_python()  # {col: python_type}
+    python_types = frame.collect_schema().to_python()  # {col: python_type}
     return {
         col: TypeAdapter(python_type).json_schema()
         for col, python_type in python_types.items()
@@ -76,28 +76,6 @@ class PolarsFastDataframeModel(FastDataframeModel):
                 )
         return errors
 
-    @staticmethod
-    def _polars_dtype_to_json_schema(dtype: pl.DataType) -> str:
-        """Map Polars dtype to JSON schema type string."""
-        dtype_str = str(dtype)
-        if dtype_str.startswith("Int"):
-            return "integer"
-        if dtype_str.startswith("Float"):
-            return "number"
-        if dtype_str == "String":
-            return "string"
-        if dtype_str == "Boolean":
-            return "boolean"
-        if dtype_str == "Date":
-            return "date"
-        if dtype_str == "Datetime":
-            return "datetime"
-        if dtype_str == "Time":
-            return "time"
-        if dtype_str == "Duration":
-            return "timedelta"
-        return dtype_str  # fallback for unknown types
-
     @classmethod
     def _validate_column_types(
         cls, model_schema: dict, frame_schema: dict
@@ -118,17 +96,17 @@ class PolarsFastDataframeModel(FastDataframeModel):
         return errors
 
     @classmethod
-    def validate_schema(cls, lazy_frame: pl.LazyFrame) -> list[ValidationError]:
+    def validate_schema(cls, frame: pl.LazyFrame | pl.DataFrame) -> list[ValidationError]:
         """Validate the schema of a polars lazy frame against the model's schema.
 
         Args:
-            lazy_frame: The polars lazy frame to validate.
+            frame: The polars lazy frame or dataframe to validate.
 
         Returns:
             List[ValidationError]: A list of validation errors.
         """
         model_schema = cls.model_json_schema()["properties"]
-        frame_schema = _extract_polars_frame_json_schema(lazy_frame)
+        frame_schema = _extract_polars_frame_json_schema(frame)
 
         # Collect all validation errors
         errors = {}
