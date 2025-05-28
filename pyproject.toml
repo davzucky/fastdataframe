@@ -53,6 +53,7 @@ dev = [
     "ruff>=0.11.10",
     "pytest-cov>=6.1.1",
     "isodate>=0.7.2",
+    "rich>=14.0.0",
 ]
 
 [tool.hatch.build]
