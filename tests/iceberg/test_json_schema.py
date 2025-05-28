@@ -1,5 +1,4 @@
 import pytest
-from pyiceberg.schema import Schema, visit
 from pyiceberg.types import (
     NestedField,
     IntegerType,

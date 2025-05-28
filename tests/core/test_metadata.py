@@ -2,7 +2,6 @@
 
 import dataclasses
 import pytest
-from typing import Optional, Union, Annotated
 from fastdataframe.core.annotation import FastDataframe
 
 

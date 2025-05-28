@@ -46,30 +46,30 @@ def constraints_are_superset(left: dict, right: dict, keys: list[str]) -> bool:
     For uniqueItems: left must be False if right is False (left allows more)
     """
     for key in keys:
-        l = left.get(key)
-        r = right.get(key)
-        if r is None:
+        l_value = left.get(key)
+        r_value = right.get(key)
+        if r_value is None:
             continue  # right is unconstrained, left can be anything
         if key in ("minimum", "exclusiveMinimum", "minLength", "minItems"):
-            if l is not None and l > r:
-                logger.debug(f"Constraint fail: {key}: left {l} > right {r}")
+            if l_value is not None and l_value > r_value:
+                logger.debug(f"Constraint fail: {key}: left {l_value} > right {r_value}")
                 return False
         elif key in ("maximum", "exclusiveMaximum", "maxLength", "maxItems"):
-            if l is not None and l < r:
-                logger.debug(f"Constraint fail: {key}: left {l} < right {r}")
+            if l_value is not None and l_value < r_value:
+                logger.debug(f"Constraint fail: {key}: left {l_value} < right {r_value}")
                 return False
         elif key == "multipleOf":
-            if l is not None and (r % l != 0):
-                logger.debug(f"Constraint fail: multipleOf: right {r} % left {l} != 0")
+            if l_value is not None and (r_value % l_value != 0):
+                logger.debug(f"Constraint fail: multipleOf: right {r_value} % left {l_value} != 0")
                 return False
         elif key == "pattern":
-            if l is not None and l != r:
-                logger.debug(f"Constraint fail: pattern: left {l} != right {r}")
+            if l_value is not None and l_value != r_value:
+                logger.debug(f"Constraint fail: pattern: left {l_value} != right {r_value}")
                 return False
         elif key == "uniqueItems":
-            if r is False and l is not False:
+            if r_value is False and l_value is not False:
                 logger.debug(
-                    f"Constraint fail: uniqueItems: right is False, left is not False"
+                    "Constraint fail: uniqueItems: right is False, left is not False"
                 )
                 return False
     return True

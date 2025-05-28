@@ -1,6 +1,6 @@
 from fastdataframe.core.model import FastDataframeModel
 from fastdataframe.core.validation import ValidationError
-from typing import ClassVar, List
+from typing import List
 from pyiceberg.table import Table
 
 class IcebergFastDataframeModel(FastDataframeModel):

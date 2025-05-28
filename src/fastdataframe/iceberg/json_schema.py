@@ -1,6 +1,6 @@
 from typing import Any, Union
 from pyiceberg.schema import Schema, SchemaVisitorPerPrimitiveType, visit
-from pyiceberg.types import NestedField, IcebergType, IntegerType, BooleanType, LongType, FloatType, DoubleType, StringType, DateType, TimeType, TimestampType, TimestamptzType, UUIDType, BinaryType, FixedType, DecimalType, StructType, ListType, MapType, Field
+from pyiceberg.types import NestedField, IcebergType, IntegerType, BooleanType, LongType, FloatType, DoubleType, StringType, DateType, TimeType, TimestampType, TimestamptzType, UUIDType, BinaryType, FixedType, DecimalType, StructType, ListType, MapType
 
 class JsonSchemaVisitor(SchemaVisitorPerPrimitiveType[dict[str, Any]]):
     def visit_boolean(self, field: BooleanType) -> dict[str, Any]:

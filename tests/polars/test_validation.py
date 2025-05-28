@@ -4,9 +4,7 @@ import polars as pl
 from fastdataframe.polars.model import PolarsFastDataframeModel
 from fastdataframe.core.model import FastDataframeModel
 from typing import Optional
-import pytest
 import datetime as dt
-import isodate
 
 
 class TestModel(PolarsFastDataframeModel):
