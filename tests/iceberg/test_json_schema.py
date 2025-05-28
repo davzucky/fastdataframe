@@ -21,6 +21,7 @@ from pyiceberg.types import (
     MapType,
 )
 from fastdataframe.iceberg.json_schema import iceberg_schema_to_json_schema
+from typing import Any
 
 
 @pytest.mark.parametrize(
@@ -55,6 +56,6 @@ from fastdataframe.iceberg.json_schema import iceberg_schema_to_json_schema
         ),
     ],
 )
-def test_iceberg_schema_to_json_schema_primitive(iceberg_type, expected_schema):
+def test_iceberg_schema_to_json_schema_primitive(iceberg_type: Any, expected_schema: dict[str, Any]) -> None:
     json_schema = iceberg_schema_to_json_schema(iceberg_type)
     assert json_schema == expected_schema
