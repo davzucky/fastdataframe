@@ -10,7 +10,7 @@ readme = "README.md"
 requires-python = ">=3.12"
 license = "MIT"
 dependencies = [
-    "pydantic>=2.0.0",
+    "pydantic>=2.0,<3.0",
     "annotated-types>=0.5.0",
 ]
 classifiers = [
@@ -27,6 +27,9 @@ classifiers = [
 [project.optional-dependencies]
 polars = [
     "polars>=1.26.0",
+]
+iceberg = [
+    "pyiceberg>=0.9",
 ]
 
 
@@ -53,7 +56,7 @@ dev = [
     "ruff>=0.11.10",
     "pytest-cov>=6.1.1",
     "isodate>=0.7.2",
-    "rich>=14.0.0",
+    "rich>=10.0",
 ]
 
 [tool.hatch.build]
