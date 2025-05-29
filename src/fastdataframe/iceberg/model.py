@@ -1,10 +1,59 @@
 from fastdataframe.core.model import FastDataframeModel
 from fastdataframe.core.validation import ValidationError
-from typing import List
+from typing import List, get_args, get_origin, Annotated
 from pyiceberg.table import Table
+from pyiceberg.types import (
+    NestedField, IntegerType, BooleanType, LongType, FloatType, DoubleType, StringType, DateType, TimeType, TimestampType, TimestamptzType, UUIDType, BinaryType, FixedType, DecimalType
+)
+from pyiceberg.schema import Schema
+from fastdataframe.core.types_helper import is_optional_type
 
 class IcebergFastDataframeModel(FastDataframeModel):
     """A model that extends FastDataframeModel for Iceberg integration."""
+
+    @classmethod
+    def to_iceberg_schema(cls) -> Schema:
+        """Return a pyiceberg Schema based on the model's fields, supporting Optional types."""
+        def python_type_to_iceberg_type(py_type):
+            origin = get_origin(py_type)
+            if origin is Annotated:
+                py_type = get_args(py_type)[0]
+            # Unwrap Optional/Union[..., NoneType]
+            if is_optional_type(py_type):
+                args = get_args(py_type)
+                # Remove NoneType from Union
+                py_type = next((a for a in args if a is not type(None)), None)
+            if py_type is int:
+                return IntegerType()
+            elif py_type is bool:
+                return BooleanType()
+            elif py_type is float:
+                return DoubleType()
+            elif py_type is str:
+                return StringType()
+            # Add more mappings as needed
+            # Example: datetime.date, datetime.datetime, uuid.UUID, bytes, etc.
+            import datetime, uuid
+            if py_type is datetime.date:
+                return DateType()
+            if py_type is datetime.time:
+                return TimeType()
+            if py_type is datetime.datetime:
+                return TimestampType()
+            if py_type is uuid.UUID:
+                return UUIDType()
+            if py_type is bytes:
+                return BinaryType()
+            return StringType()  # fallback
+
+        fields = []
+        for idx, (field_name, model_field) in enumerate(cls.model_fields.items(), 1):
+            py_type = model_field.annotation
+            nullable = is_optional_type(py_type)
+
+            iceberg_type = python_type_to_iceberg_type(py_type)
+            fields.append(NestedField(field_id=idx, name=field_name, field_type=iceberg_type, required=not nullable))
+        return Schema(*fields)
 
     @classmethod
     def validate_table(cls, table: Table) -> List[ValidationError]:
