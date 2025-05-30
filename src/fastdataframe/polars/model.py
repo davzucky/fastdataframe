@@ -50,7 +50,6 @@ class PolarsFastDataframeModel(FastDataframeModel):
             f"{model.__name__}Polars",
             __base__=cls,
             __doc__=f"Polars version of {model.__name__}",
-            # field_definitions=**field_definitions
             **field_definitions,
         )
         return new_model

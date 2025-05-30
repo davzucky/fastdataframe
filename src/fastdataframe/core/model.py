@@ -8,7 +8,7 @@ from pydantic._internal._model_construction import (
 )
 
 from .annotation import FastDataframe
-from .types_helper import contains_type, filter_type, get_item_of_type
+from .types_helper import contains_type
 
 T = TypeVar("T", bound="FastDataframeModel")
 
@@ -38,19 +38,12 @@ class FastDataframeModelMetaclass(PydanticModelMetaclass):
                     field_type, FastDataframe.from_field_type(field_type)
                 ]
             elif origin is Annotated and contains_type(list(args), FastDataframe):
-                fastdataframe_item = get_item_of_type(args, FastDataframe)
-                temp_args = filter_type(list(args), FastDataframe)
-                if fastdataframe_item is not None:
-                    temp_args.append(
-                        fastdataframe_item.set_is_nullable_from_type(args[0])
-                    )
-                new_class_dict["__annotations__"][field_name] = Annotated[
-                    tuple(temp_args)
-                ]
+                # Just keep the FastDataframe as is, do not try to set nullability
+                new_class_dict["__annotations__"][field_name] = field_type
             else:
                 new_class_dict["__annotations__"][field_name] = Annotated[
                     args + (FastDataframe.from_field_type(args[0]),)
-                ]  # else:
+                ]
 
         return super().__new__(mcs, name, bases, new_class_dict, **kwargs)
 

@@ -8,26 +8,23 @@ from fastdataframe.core.annotation import FastDataframe
 def test_fastdataframe_default_values() -> None:
     """Test that FastDataframe has correct default values."""
     metadata = FastDataframe()
-    assert metadata.is_nullable is None
     assert metadata.is_unique is False
 
 
 def test_fastdataframe_custom_values() -> None:
     """Test that FastDataframe accepts custom values."""
-    metadata = FastDataframe(is_nullable=False, is_unique=True)
-    assert metadata.is_nullable is False
+    metadata = FastDataframe(is_unique=True)
     assert metadata.is_unique is True
 
 
 def test_fastdataframe_schema_generation() -> None:
     """Test that FastDataframe generates correct schema."""
-    metadata = FastDataframe(is_nullable=False, is_unique=True)
+    metadata = FastDataframe(is_unique=True)
     schema = metadata.__get_pydantic_core_schema__(int, lambda x: {"type": "integer"})
 
     # Check that json_schema_extra contains our metadata
     assert "json_schema_extra" in schema
     extra = schema["json_schema_extra"]
-    assert extra["is_nullable"] is False
     assert extra["is_unique"] is True
 
     # Check that _fastdataframe document is present and correct
@@ -35,7 +32,7 @@ def test_fastdataframe_schema_generation() -> None:
     doc = extra["_fastdataframe"]
     assert doc["type"] == "FastDataframe"
     assert doc["version"] == "1.0"
-    assert doc["properties"] == {"is_nullable": False, "is_unique": True}
+    assert doc["properties"] == {"is_unique": True}
 
 
 def test_fastdataframe_from_schema() -> None:
@@ -43,19 +40,17 @@ def test_fastdataframe_from_schema() -> None:
     # Create a schema with FastDataframe metadata
     schema = {
         "json_schema_extra": {
-            "is_nullable": False,
             "is_unique": True,
             "_fastdataframe": {
                 "type": "FastDataframe",
                 "version": "1.0",
-                "properties": {"is_nullable": False, "is_unique": True},
+                "properties": {"is_unique": True},
             },
         }
     }
 
     # Reconstruct FastDataframe from schema
     metadata = FastDataframe.from_schema(schema)
-    assert metadata.is_nullable is False
     assert metadata.is_unique is True
 
 
@@ -66,7 +61,7 @@ def test_fastdataframe_from_schema_invalid_type() -> None:
             "_fastdataframe": {
                 "type": "InvalidType",
                 "version": "1.0",
-                "properties": {"is_nullable": False, "is_unique": True},
+                "properties": {"is_unique": True},
             }
         }
     }
@@ -84,7 +79,7 @@ def test_fastdataframe_from_schema_invalid_version() -> None:
             "_fastdataframe": {
                 "type": "FastDataframe",
                 "version": "2.0",
-                "properties": {"is_nullable": False, "is_unique": True},
+                "properties": {"is_unique": True},
             }
         }
     }
@@ -101,7 +96,6 @@ def test_fastdataframe_from_schema_missing_properties() -> None:
                 "type": "FastDataframe",
                 "version": "1.0",
                 "properties": {
-                    "is_nullable": False
                     # is_unique is missing
                 },
             }
@@ -115,9 +109,6 @@ def test_fastdataframe_from_schema_missing_properties() -> None:
 def test_fastdataframe_immutability() -> None:
     """Test that FastDataframe instances are immutable."""
     metadata = FastDataframe()
-
-    with pytest.raises(dataclasses.FrozenInstanceError):
-        metadata.is_nullable = False  # type: ignore[misc]
 
     with pytest.raises(dataclasses.FrozenInstanceError):
         metadata.is_unique = True  # type: ignore[misc]

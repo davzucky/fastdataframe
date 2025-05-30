@@ -1,10 +1,9 @@
 """Annotation classes for FastDataframe."""
 
-from dataclasses import dataclass, replace
-from typing import Any, Optional, Self, cast
+from dataclasses import dataclass
+from typing import Any, Self, cast
 from pydantic._internal._fields import PydanticMetadata
 from annotated_types import BaseMetadata
-from .types_helper import is_optional_type
 
 
 @dataclass(frozen=True)
@@ -15,11 +14,9 @@ class FastDataframe(PydanticMetadata, BaseMetadata):
     that are used in FastDataframe operations.
 
     Attributes:
-        is_nullable: Whether the field can be null/None
         is_unique: Whether the field values must be unique
     """
 
-    is_nullable: Optional[bool] = None
     is_unique: bool = False
 
     def __get_pydantic_core_schema__(
@@ -41,14 +38,12 @@ class FastDataframe(PydanticMetadata, BaseMetadata):
         schema = cast(dict[str, Any], handler(source_type))
         # Add both the properties and a reconstruction document
         schema["json_schema_extra"] = {
-            "is_nullable": self.is_nullable,
             "is_unique": self.is_unique,
             # Add a document that can be used to reconstruct the FastDataframe
             "_fastdataframe": {
                 "type": "FastDataframe",
                 "version": "1.0",
                 "properties": {
-                    "is_nullable": self.is_nullable,
                     "is_unique": self.is_unique,
                 },
             },
@@ -85,7 +80,7 @@ class FastDataframe(PydanticMetadata, BaseMetadata):
         Returns:
             A new FastDataframe instance
         """
-        return cls(is_nullable=is_optional_type(field_type))
+        return cls()
 
     @classmethod
     def from_schema(cls, schema: dict[str, Any]) -> "FastDataframe":
@@ -118,24 +113,13 @@ class FastDataframe(PydanticMetadata, BaseMetadata):
             raise ValueError("Invalid properties in FastDataframe document")
 
         # Validate required properties
-        required_props = {"is_nullable", "is_unique"}
+        required_props = {"is_unique"}
         if not all(prop in properties for prop in required_props):
             raise ValueError(
                 f"Missing required properties: {required_props - set(properties.keys())}"
             )
 
         return cls(**properties)
-
-    def set_is_nullable_from_type(self, field_type: Any) -> Self:
-        """Set the is_nullable attribute.
-
-        Args:
-            is_nullable: The new value for is_nullable
-
-        Returns:
-            A new FastDataframe instance with the updated is_nullable attribute
-        """
-        return replace(self, is_nullable=is_optional_type(field_type))
 
     def as_field_metadata(self) -> dict[str, Any]:
         """Return a dictionary suitable for use as Pydantic Field(json_schema_extra=...)."""
@@ -144,10 +128,8 @@ class FastDataframe(PydanticMetadata, BaseMetadata):
                 "type": "FastDataframe",
                 "version": "1.0",
                 "properties": {
-                    "is_nullable": self.is_nullable,
                     "is_unique": self.is_unique,
                 },
             },
-            "is_nullable": self.is_nullable,
             "is_unique": self.is_unique,
         }
