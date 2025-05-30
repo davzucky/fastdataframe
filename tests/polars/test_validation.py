@@ -1,10 +1,11 @@
 """Tests for validation models."""
 
 import polars as pl
+import datetime as dt
+from pydantic import BaseModel, Field
 from fastdataframe.polars.model import PolarsFastDataframeModel
 from fastdataframe.core.model import FastDataframeModel
-from typing import Optional
-import datetime as dt
+from typing import Annotated, Optional
 
 
 class TestModel(PolarsFastDataframeModel):
@@ -29,6 +30,8 @@ def test_from_fastdataframe_model_basic_conversion() -> None:
     # Convert to PolarsFastDataframeModel
     PolarsModel = PolarsFastDataframeModel.from_fastdataframe_model(BaseModel)
 
+    print("PolarsModel.__dict__:", PolarsModel.__dict__)
+
     # Verify the new class inherits from PolarsFastDataframeModel
     assert issubclass(PolarsModel, PolarsFastDataframeModel)
 
@@ -40,6 +43,11 @@ def test_from_fastdataframe_model_basic_conversion() -> None:
 
     # Verify the docstring is updated
     assert PolarsModel.__doc__ == "Polars version of BaseModel"
+
+    polars_json_schema = PolarsModel.model_json_schema()
+    base_json_shema = BaseModel.model_json_schema()
+    assert polars_json_schema["properties"] == base_json_shema["properties"]
+    assert polars_json_schema["required"] == base_json_shema["required"]
 
 
 def test_from_fastdataframe_model_valid_frame() -> None:
@@ -185,3 +193,28 @@ def test_polarsfastdataframemodel_with_temporal_types() -> None:
     assert len(errors) == 0, (
         f"Temporal types frame should not have validation errors, got: {errors}"
     )
+
+
+def test_clone_model() -> None:
+    from pydantic import create_model
+
+
+    class Simple(BaseModel):
+        val: int = 1
+        val_none: Optional[int] = None
+        val_no_default: str
+        val_annotation: Annotated[Optional[str], Field(alias="test")] = None
+
+    class SimpleClass:
+        val: int = 1
+        val_none: Optional[int] = None
+        val_no_default: str
+        val_annotation: Annotated[Optional[str], "test"] = None
+
+    field_definitions = {
+        # field_name: (field_type,  attr if (attr := getattr(Simple, field_name, ...)) is not Ellipsis else None)
+        field_name: (field_type,  Simple.model_fields[field_name])
+        for field_name, field_type in Simple.__annotations__.items()
+    }
+    SimpleModel = create_model('SimpleModel', **field_definitions)
+    print(SimpleModel.__fields__)

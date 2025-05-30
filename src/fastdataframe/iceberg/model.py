@@ -3,7 +3,7 @@ from fastdataframe.core.validation import ValidationError
 from typing import List, get_args, get_origin, Annotated
 from pyiceberg.table import Table
 from pyiceberg.types import (
-    NestedField, IntegerType, BooleanType, LongType, FloatType, DoubleType, StringType, DateType, TimeType, TimestampType, TimestamptzType, UUIDType, BinaryType, FixedType, DecimalType
+    NestedField, IntegerType, BooleanType, DoubleType, StringType, DateType, TimeType, TimestampType, UUIDType, BinaryType
 )
 from pyiceberg.schema import Schema
 from fastdataframe.core.types_helper import is_optional_type
@@ -26,7 +26,8 @@ def python_type_to_iceberg_type(py_type):
         return DoubleType()
     elif py_type is str:
         return StringType()
-    import datetime, uuid
+    import datetime
+    import uuid
     if py_type is datetime.date:
         return DateType()
     if py_type is datetime.time:
