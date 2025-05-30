@@ -7,7 +7,7 @@ from annotated_types import BaseMetadata
 
 
 @dataclass(frozen=True)
-class FastDataframe(PydanticMetadata, BaseMetadata):
+class ColumnInfo(PydanticMetadata, BaseMetadata):
     """Custom annotation for FastDataframe fields.
 
     This annotation class is used to store additional information about fields
@@ -83,7 +83,7 @@ class FastDataframe(PydanticMetadata, BaseMetadata):
         return cls()
 
     @classmethod
-    def from_schema(cls, schema: dict[str, Any]) -> "FastDataframe":
+    def from_schema(cls, schema: dict[str, Any]) -> "ColumnInfo":
         """Create a FastDataframe instance from a schema.
 
         Args:

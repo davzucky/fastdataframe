@@ -5,7 +5,7 @@ from pydantic import Field, create_model
 import pytest
 
 from fastdataframe.core.model import FastDataframeModel
-from fastdataframe.core.annotation import FastDataframe
+from fastdataframe.core.annotation import ColumnInfo
 
 
 @pytest.mark.parametrize(
@@ -36,19 +36,19 @@ from fastdataframe.core.annotation import FastDataframe
         ({"test_field": (Optional[Dict[str, Any]], None)}, True, False),
         # Annotated types with explicit metadata
         (
-            {"test_field": (Annotated[int, FastDataframe(is_unique=True)], ...)},
+            {"test_field": (Annotated[int, ColumnInfo(is_unique=True)], ...)},
             False,
             True,
         ),
         (
-            {"test_field": (Annotated[str, FastDataframe(is_unique=True)], ...)},
+            {"test_field": (Annotated[str, ColumnInfo(is_unique=True)], ...)},
             False,
             True,
         ),
         (
             {
                 "test_field": (
-                    Annotated[Optional[int], FastDataframe(is_unique=False)],
+                    Annotated[Optional[int], ColumnInfo(is_unique=False)],
                     None,
                 )
             },
@@ -58,7 +58,7 @@ from fastdataframe.core.annotation import FastDataframe
         (
             {
                 "test_field": (
-                    Annotated[Optional[str], FastDataframe(is_unique=True)],
+                    Annotated[Optional[str], ColumnInfo(is_unique=True)],
                     None,
                 )
             },
@@ -94,7 +94,7 @@ def test_get_fastdataframe_annotations() -> None:
         field1: int
         field2: str
         field3: Optional[float] = None
-        field4: Annotated[bool, FastDataframe(is_unique=True)]
+        field4: Annotated[bool, ColumnInfo(is_unique=True)]
 
     annotations = MyModel.get_fastdataframe_annotations()
     assert isinstance(annotations, dict)
