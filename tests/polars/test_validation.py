@@ -2,10 +2,9 @@
 
 import polars as pl
 import datetime as dt
-from pydantic import BaseModel, Field
 from fastdataframe.polars.model import PolarsFastDataframeModel
 from fastdataframe.core.model import FastDataframeModel
-from typing import Annotated, Optional
+from typing import Optional
 
 
 class TestModel(PolarsFastDataframeModel):
@@ -193,28 +192,3 @@ def test_polarsfastdataframemodel_with_temporal_types() -> None:
     assert len(errors) == 0, (
         f"Temporal types frame should not have validation errors, got: {errors}"
     )
-
-
-def test_clone_model() -> None:
-    from pydantic import create_model
-
-
-    class Simple(BaseModel):
-        val: int = 1
-        val_none: Optional[int] = None
-        val_no_default: str
-        val_annotation: Annotated[Optional[str], Field(alias="test")] = None
-
-    class SimpleClass:
-        val: int = 1
-        val_none: Optional[int] = None
-        val_no_default: str
-        val_annotation: Annotated[Optional[str], "test"] = None
-
-    field_definitions = {
-        # field_name: (field_type,  attr if (attr := getattr(Simple, field_name, ...)) is not Ellipsis else None)
-        field_name: (field_type,  Simple.model_fields[field_name])
-        for field_name, field_type in Simple.__annotations__.items()
-    }
-    SimpleModel = create_model('SimpleModel', **field_definitions)
-    print(SimpleModel.__fields__)

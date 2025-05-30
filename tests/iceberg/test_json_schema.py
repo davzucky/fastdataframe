@@ -50,11 +50,13 @@ from typing import Any
         ),
         (ListType(1, IntegerType()), {"type": "array", "items": {"type": "integer"}}),
         (
-            MapType(1,StringType(), 2, IntegerType()),
+            MapType(1, StringType(), 2, IntegerType()),
             {"type": "object", "additionalProperties": {"type": "integer"}},
         ),
     ],
 )
-def test_iceberg_schema_to_json_schema_primitive(iceberg_type: Any, expected_schema: dict[str, Any]) -> None:
+def test_iceberg_schema_to_json_schema_primitive(
+    iceberg_type: Any, expected_schema: dict[str, Any]
+) -> None:
     json_schema = iceberg_schema_to_json_schema(iceberg_type)
     assert json_schema == expected_schema

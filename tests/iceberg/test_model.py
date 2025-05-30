@@ -8,6 +8,7 @@ from pyiceberg.types import (
     BinaryType,
     UUIDType,
     TimestampType,
+    IcebergType,
 )
 from fastdataframe.iceberg.model import IcebergFastDataframeModel
 import datetime
@@ -28,7 +29,9 @@ import typing
         (datetime.datetime, TimestampType),
     ],
 )
-def test_to_iceberg_schema(field_type, expected_iceberg_type):
+def test_to_iceberg_schema(
+    field_type: typing.Any, expected_iceberg_type: typing.Type[IcebergType]
+) -> None:
     # Dynamically create a model class with a single field
     class DynamicModel(IcebergFastDataframeModel):
         field_name: field_type
@@ -61,7 +64,11 @@ def test_to_iceberg_schema(field_type, expected_iceberg_type):
         (typing.Optional[datetime.datetime], TimestampType, False),
     ],
 )
-def test_to_iceberg_schema_required(field_type, expected_iceberg_type, expected_required):
+def test_to_iceberg_schema_required(
+    field_type: typing.Any,
+    expected_iceberg_type: typing.Type[IcebergType],
+    expected_required: bool,
+) -> None:
     class DynamicModel(IcebergFastDataframeModel):
         field_name: field_type
 

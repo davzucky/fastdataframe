@@ -5,7 +5,7 @@ from fastdataframe.core.validation import ValidationError
 from fastdataframe.core.types import get_type_name, json_schema_is_subset
 import polars as pl
 from typing import Any, Type, TypeVar
-from pydantic import TypeAdapter, create_model
+from pydantic import BaseModel, TypeAdapter, create_model
 
 T = TypeVar("T", bound="PolarsFastDataframeModel")
 
@@ -32,29 +32,26 @@ class PolarsFastDataframeModel(FastDataframeModel):
     """A model that extends FastDataframeModel for Polars integration."""
 
     @classmethod
-    def from_fastdataframe_model(
-        cls: Type[T], model: type[FastDataframeModel]
-    ) -> Type[T]:
+    def from_fastdataframe_model(cls: Type[T], model: type[Any]) -> type[T]:
         """Convert any FastDataframeModel to a PolarsFastDataframeModel using create_model."""
-        # fields = 
-        # for field_name, model_field in model.model_fields.items():
-        #     annotation = model_field.annotation
-        #     if model_field.default is not None or model_field.default_factory is not None:
-        #         default = model_field.default if model_field.default is not None else model_field.default_factory
-        #         fields[field_name] = (annotation, default)
-        #     else:
-        #         fields[field_name] = (annotation, ...)
 
+        is_base_model = issubclass(model, BaseModel)
         field_definitions = {
-        # field_name: (field_type,  attr if (attr := getattr(Simple, field_name, ...)) is not Ellipsis else None)
-                field_name: (field_type,  model.model_fields[field_name])
-                for field_name, field_type in model.__annotations__.items()
-            }
-        new_model = create_model(
+            field_name: (
+                field_type,
+                model.model_fields[field_name]
+                if is_base_model
+                else getattr(model, field_name, ...),
+            )
+            for field_name, field_type in model.__annotations__.items()
+        }
+
+        new_model: type[T] = create_model(
             f"{model.__name__}Polars",
             __base__=cls,
             __doc__=f"Polars version of {model.__name__}",
-            **field_definitions
+            # field_definitions=**field_definitions
+            **field_definitions,
         )
         return new_model
 
@@ -66,8 +63,8 @@ class PolarsFastDataframeModel(FastDataframeModel):
         errors = {}
         # currently pydantic add all the fields
         # https://github.com/pydantic/pydantic/issues/7161
-        model_required_fields =set( model_json_schema.get("required", []))
-        df_required_fields =set( df_json_schema.get("required", []))
+        model_required_fields = set(model_json_schema.get("required", []))
+        df_required_fields = set(df_json_schema.get("required", []))
 
         for field_name in model_required_fields.difference(df_required_fields):
             errors[field_name] = ValidationError(
@@ -98,7 +95,9 @@ class PolarsFastDataframeModel(FastDataframeModel):
         return errors
 
     @classmethod
-    def validate_schema(cls, frame: pl.LazyFrame | pl.DataFrame) -> list[ValidationError]:
+    def validate_schema(
+        cls, frame: pl.LazyFrame | pl.DataFrame
+    ) -> list[ValidationError]:
         """Validate the schema of a polars lazy frame against the model's schema.
 
         Args:

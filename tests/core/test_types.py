@@ -48,7 +48,9 @@ from decimal import Decimal
         (int | float | str, int | float, True),
     ],
 )
-def test_json_schema_is_subset_param(left_type: type, right_type: type, expected_result: bool) -> None:
+def test_json_schema_is_subset_param(
+    left_type: type, right_type: type, expected_result: bool
+) -> None:
     left_schema = TypeAdapter(left_type).json_schema()
     right_schema = TypeAdapter(right_type).json_schema()
     assert json_schema_is_subset(left_schema, right_schema) is expected_result

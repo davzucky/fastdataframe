@@ -52,19 +52,27 @@ def constraints_are_superset(left: dict, right: dict, keys: list[str]) -> bool:
             continue  # right is unconstrained, left can be anything
         if key in ("minimum", "exclusiveMinimum", "minLength", "minItems"):
             if l_value is not None and l_value > r_value:
-                logger.debug(f"Constraint fail: {key}: left {l_value} > right {r_value}")
+                logger.debug(
+                    f"Constraint fail: {key}: left {l_value} > right {r_value}"
+                )
                 return False
         elif key in ("maximum", "exclusiveMaximum", "maxLength", "maxItems"):
             if l_value is not None and l_value < r_value:
-                logger.debug(f"Constraint fail: {key}: left {l_value} < right {r_value}")
+                logger.debug(
+                    f"Constraint fail: {key}: left {l_value} < right {r_value}"
+                )
                 return False
         elif key == "multipleOf":
             if l_value is not None and (r_value % l_value != 0):
-                logger.debug(f"Constraint fail: multipleOf: right {r_value} % left {l_value} != 0")
+                logger.debug(
+                    f"Constraint fail: multipleOf: right {r_value} % left {l_value} != 0"
+                )
                 return False
         elif key == "pattern":
             if l_value is not None and l_value != r_value:
-                logger.debug(f"Constraint fail: pattern: left {l_value} != right {r_value}")
+                logger.debug(
+                    f"Constraint fail: pattern: left {l_value} != right {r_value}"
+                )
                 return False
         elif key == "uniqueItems":
             if r_value is False and l_value is not False:
