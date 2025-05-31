@@ -2,7 +2,10 @@ from fastdataframe.core.validation import ValidationError
 from fastdataframe.core.types import get_type_name, json_schema_is_subset
 from typing import Any
 
-def validate_missing_columns(model_json_schema: dict, df_json_schema: dict) -> dict[str, ValidationError]:
+
+def validate_missing_columns(
+    model_json_schema: dict, df_json_schema: dict
+) -> dict[str, ValidationError]:
     """Validate if all required columns are present in the frame, using the 'required' key from the model's JSON schema."""
     errors = {}
     # currently pydantic add all the fields
@@ -18,7 +21,10 @@ def validate_missing_columns(model_json_schema: dict, df_json_schema: dict) -> d
         )
     return errors
 
-def validate_column_types(model_json_schema: dict[str, Any], df_json_schema: dict[str, Any]) -> dict[str, ValidationError]:
+
+def validate_column_types(
+    model_json_schema: dict[str, Any], df_json_schema: dict[str, Any]
+) -> dict[str, ValidationError]:
     """Validate if column types match the expected types, using FastDataframe.is_nullable."""
     errors = {}
     model_properties = model_json_schema.get("properties", {})
@@ -33,4 +39,4 @@ def validate_column_types(model_json_schema: dict[str, Any], df_json_schema: dic
                 error_type="TypeMismatch",
                 error_details=f"Expected type {get_type_name(field_schema)}, but got {get_type_name(frame_schema_field)}.",
             )
-    return errors 
+    return errors

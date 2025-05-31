@@ -79,7 +79,7 @@ def test_model_base_type(
 
     assert issubclass(my_model, FastDataframeModel)
     schema = my_model.model_json_schema()
-    
+
     required_fields = schema.get("required", [])
     if expected_is_nullable:
         assert "test_field" not in required_fields

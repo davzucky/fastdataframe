@@ -1,3 +1,4 @@
+from fastdataframe.core.json_schema import validate_missing_columns
 from fastdataframe.core.model import FastDataframeModel
 from fastdataframe.core.validation import ValidationError
 from typing import Any, List, get_args, get_origin, Annotated
@@ -17,6 +18,7 @@ from pyiceberg.types import (
 )
 from pyiceberg.schema import Schema
 from fastdataframe.core.types_helper import is_optional_type
+from .json_schema import iceberg_schema_to_json_schema
 
 
 # Helper function to map Python/Pydantic types to pyiceberg types
@@ -56,8 +58,6 @@ def _python_type_to_iceberg_type(py_type: Any) -> IcebergType:
 class IcebergFastDataframeModel(FastDataframeModel):
     """A model that extends FastDataframeModel for Iceberg integration."""
 
-
-
     @classmethod
     def iceberg_schema(cls) -> Schema:
         """Return a pyiceberg Schema based on the model's fields, supporting Optional types."""
@@ -86,16 +86,11 @@ class IcebergFastDataframeModel(FastDataframeModel):
         Returns:
             List[ValidationError]: A list of validation errors (missing columns).
         """
-        model_fields = set(cls.model_fields.keys())
-        table_columns = set(field.name for field in table.schema().fields)
-        errors = []
-        for field in model_fields:
-            if field not in table_columns:
-                errors.append(
-                    ValidationError(
-                        column_name=field,
-                        error_type="MissingColumn",
-                        error_details=f"Column {field} is missing in the Iceberg table.",
-                    )
-                )
-        return errors
+
+        table_json_schema = iceberg_schema_to_json_schema(table.schema())
+        model_json_schema = cls.model_json_schema()
+
+        errors = {}
+        errors.update(validate_missing_columns(model_json_schema, table_json_schema))
+
+        return list(errors.values())

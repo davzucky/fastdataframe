@@ -2,11 +2,13 @@
 
 from fastdataframe.core.model import FastDataframeModel
 from fastdataframe.core.validation import ValidationError
-from fastdataframe.core.types import get_type_name, json_schema_is_subset
 import polars as pl
 from typing import Any, Type, TypeVar
 from pydantic import BaseModel, TypeAdapter, create_model
-from fastdataframe.core.json_schema import validate_missing_columns, validate_column_types
+from fastdataframe.core.json_schema import (
+    validate_missing_columns,
+    validate_column_types,
+)
 
 T = TypeVar("T", bound="PolarsFastDataframeModel")
 
