@@ -36,7 +36,7 @@ def test_to_iceberg_schema(
     class DynamicModel(IcebergFastDataframeModel):
         field_name: field_type
 
-    schema = DynamicModel.to_iceberg_schema()
+    schema = DynamicModel.iceberg_schema()
     assert len(schema.fields) == 1
     field = schema.fields[0]
     assert isinstance(field.field_type, expected_iceberg_type)
@@ -72,7 +72,7 @@ def test_to_iceberg_schema_required(
     class DynamicModel(IcebergFastDataframeModel):
         field_name: field_type
 
-    schema = DynamicModel.to_iceberg_schema()
+    schema = DynamicModel.iceberg_schema()
     assert len(schema.fields) == 1
     field = schema.fields[0]
     assert isinstance(field.field_type, expected_iceberg_type)

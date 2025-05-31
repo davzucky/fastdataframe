@@ -20,7 +20,7 @@ from fastdataframe.core.types_helper import is_optional_type
 
 
 # Helper function to map Python/Pydantic types to pyiceberg types
-def python_type_to_iceberg_type(py_type: Any) -> IcebergType:
+def _python_type_to_iceberg_type(py_type: Any) -> IcebergType:
     origin = get_origin(py_type)
     if origin is Annotated:
         py_type = get_args(py_type)[0]
@@ -56,14 +56,16 @@ def python_type_to_iceberg_type(py_type: Any) -> IcebergType:
 class IcebergFastDataframeModel(FastDataframeModel):
     """A model that extends FastDataframeModel for Iceberg integration."""
 
+
+
     @classmethod
-    def to_iceberg_schema(cls) -> Schema:
+    def iceberg_schema(cls) -> Schema:
         """Return a pyiceberg Schema based on the model's fields, supporting Optional types."""
         fields = []
         for idx, (field_name, model_field) in enumerate(cls.model_fields.items(), 1):
             py_type = model_field.annotation
             nullable = is_optional_type(py_type)
-            iceberg_type = python_type_to_iceberg_type(py_type)
+            iceberg_type = _python_type_to_iceberg_type(py_type)
             fields.append(
                 NestedField(
                     field_id=idx,
