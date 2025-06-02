@@ -2,9 +2,9 @@
 
 import polars as pl
 import datetime as dt
-from fastdataframe import FastDataframeModel
 from fastdataframe.polars.model import PolarsFastDataframeModel
-from typing import Optional
+
+from tests.test_models import BaseModel, TemporalModel
 
 
 class TestModel(PolarsFastDataframeModel):
@@ -16,15 +16,6 @@ class TestModel(PolarsFastDataframeModel):
 
 def test_from_fastdataframe_model_basic_conversion() -> None:
     """Test basic conversion of FastDataframeModel to PolarsFastDataframeModel."""
-
-    # Create a base model
-    class BaseModel(FastDataframeModel):
-        """Base model for testing conversion."""
-
-        name: str
-        age: int
-        is_active: bool
-        score: Optional[float] = None
 
     # Convert to PolarsFastDataframeModel
     PolarsModel = PolarsFastDataframeModel.from_base_model(BaseModel)
@@ -52,12 +43,6 @@ def test_from_fastdataframe_model_basic_conversion() -> None:
 def test_from_fastdataframe_model_valid_frame() -> None:
     """Test validation of a valid frame with the converted model."""
 
-    class BaseModel(FastDataframeModel):
-        name: str
-        age: int
-        is_active: bool
-        score: Optional[float] = None
-
     PolarsModel = PolarsFastDataframeModel.from_base_model(BaseModel)
 
     # Test validation with a valid frame
@@ -75,12 +60,6 @@ def test_from_fastdataframe_model_valid_frame() -> None:
 
 def test_from_fastdataframe_model_missing_optional() -> None:
     """Test validation of a frame missing an optional field."""
-
-    class BaseModel(FastDataframeModel):
-        name: str
-        age: int
-        is_active: bool
-        score: Optional[float] = None
 
     PolarsModel = PolarsFastDataframeModel.from_base_model(BaseModel)
 
@@ -101,12 +80,6 @@ def test_from_fastdataframe_model_missing_optional() -> None:
 
 def test_from_fastdataframe_model_type_mismatch() -> None:
     """Test validation of a frame with type mismatches."""
-
-    class BaseModel(FastDataframeModel):
-        name: str
-        age: int
-        is_active: bool
-        score: Optional[float] = None
 
     PolarsModel = PolarsFastDataframeModel.from_base_model(BaseModel)
 
@@ -165,12 +138,6 @@ def test_validate_schema_valid_frame() -> None:
 
 def test_polarsfastdataframemodel_with_temporal_types() -> None:
     """Test PolarsFastDataframeModel schema validation with date, datetime, time, and timedelta fields."""
-
-    class TemporalModel(FastDataframeModel):
-        d: dt.date
-        dt_: dt.datetime
-        t: dt.time
-        td: dt.timedelta
 
     PolarsModel = PolarsFastDataframeModel.from_base_model(TemporalModel)
 
