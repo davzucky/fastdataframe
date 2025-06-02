@@ -27,7 +27,7 @@ def test_from_fastdataframe_model_basic_conversion() -> None:
         score: Optional[float] = None
 
     # Convert to PolarsFastDataframeModel
-    PolarsModel = PolarsFastDataframeModel.from_fastdataframe_model(BaseModel)
+    PolarsModel = PolarsFastDataframeModel.from_base_model(BaseModel)
 
     print("PolarsModel.__dict__:", PolarsModel.__dict__)
 
@@ -58,7 +58,7 @@ def test_from_fastdataframe_model_valid_frame() -> None:
         is_active: bool
         score: Optional[float] = None
 
-    PolarsModel = PolarsFastDataframeModel.from_fastdataframe_model(BaseModel)
+    PolarsModel = PolarsFastDataframeModel.from_base_model(BaseModel)
 
     # Test validation with a valid frame
     valid_frame = pl.LazyFrame(
@@ -82,7 +82,7 @@ def test_from_fastdataframe_model_missing_optional() -> None:
         is_active: bool
         score: Optional[float] = None
 
-    PolarsModel = PolarsFastDataframeModel.from_fastdataframe_model(BaseModel)
+    PolarsModel = PolarsFastDataframeModel.from_base_model(BaseModel)
 
     # Test validation with an invalid frame (missing required field)
     invalid_frame = pl.LazyFrame(
@@ -108,7 +108,7 @@ def test_from_fastdataframe_model_type_mismatch() -> None:
         is_active: bool
         score: Optional[float] = None
 
-    PolarsModel = PolarsFastDataframeModel.from_fastdataframe_model(BaseModel)
+    PolarsModel = PolarsFastDataframeModel.from_base_model(BaseModel)
 
     # Test validation with type mismatch
     type_mismatch_frame = pl.LazyFrame(
@@ -172,7 +172,7 @@ def test_polarsfastdataframemodel_with_temporal_types() -> None:
         t: dt.time
         td: dt.timedelta
 
-    PolarsModel = PolarsFastDataframeModel.from_fastdataframe_model(TemporalModel)
+    PolarsModel = PolarsFastDataframeModel.from_base_model(TemporalModel)
 
     today = dt.date.today()
     now = dt.datetime.now()

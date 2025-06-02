@@ -35,7 +35,7 @@ class PolarsFastDataframeModel(FastDataframeModel):
     """A model that extends FastDataframeModel for Polars integration."""
 
     @classmethod
-    def from_fastdataframe_model(cls: Type[T], model: type[Any]) -> type[T]:
+    def from_base_model(cls: Type[T], model: type[Any]) -> type[T]:
         """Convert any FastDataframeModel to a PolarsFastDataframeModel using create_model."""
 
         is_base_model = issubclass(model, BaseModel)
@@ -54,7 +54,7 @@ class PolarsFastDataframeModel(FastDataframeModel):
             __base__=cls,
             __doc__=f"Polars version of {model.__name__}",
             **field_definitions,
-        )
+        )  # type: ignore[call-overload]
         return new_model
 
     @classmethod
