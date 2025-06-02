@@ -2,8 +2,8 @@
 
 import polars as pl
 import datetime as dt
+from fastdataframe import FastDataframeModel
 from fastdataframe.polars.model import PolarsFastDataframeModel
-from fastdataframe.core.model import FastDataframeModel
 from typing import Optional
 
 
