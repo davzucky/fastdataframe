@@ -4,8 +4,8 @@ from typing import Optional, Union, Annotated, List, Dict, Any
 from pydantic import Field, create_model
 import pytest
 
-from fastdataframe.core.model import FastDataframeModel
-from fastdataframe.core.annotation import ColumnInfo
+from fastdataframe import FastDataframeModel
+from fastdataframe import ColumnInfo
 
 
 @pytest.mark.parametrize(

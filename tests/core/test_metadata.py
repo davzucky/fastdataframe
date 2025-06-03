@@ -2,7 +2,7 @@
 
 import dataclasses
 import pytest
-from fastdataframe.core.annotation import ColumnInfo
+from fastdataframe import ColumnInfo
 
 
 def test_fastdataframe_default_values() -> None:
