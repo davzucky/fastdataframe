@@ -103,7 +103,7 @@ class IcebergFastDataframeModel(FastDataframeModel):
         return Schema(*fields)
 
     @classmethod
-    def validate_table(cls, table: Table) -> List[ValidationError]:
+    def validate_schema(cls, table: Table) -> List[ValidationError]:
         """Validate that the Iceberg table's columns match the model's fields by name only.
 
         Args:
