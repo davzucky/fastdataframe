@@ -38,13 +38,13 @@ def test_validate_table_all_columns_present(
     model: type[IcebergFastDataframeModel],
 ) -> None:
     table = DummyTable(["field1", "field2"])
-    errors = model.validate_table(table)
+    errors = model.validate_schema(table)
     assert errors == []
 
 
 def test_validate_table_missing_column(model: type[IcebergFastDataframeModel]) -> None:
     table = DummyTable(["field1"])
-    errors = model.validate_table(table)
+    errors = model.validate_schema(table)
     assert len(errors) == 1
     assert errors[0].column_name == "field2"
     assert errors[0].error_type == "MissingColumn"
