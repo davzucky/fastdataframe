@@ -1,0 +1,3 @@
+name;age;is_active;score;extra_col
+peter;12;true;3;A
+tom;34;false;16;B

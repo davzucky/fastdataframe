@@ -3,6 +3,7 @@
 import polars as pl
 import datetime as dt
 from fastdataframe.polars.model import PolarsFastDataframeModel
+from pytest import mark
 
 from tests.test_models import BaseModel, TemporalModel
 
@@ -103,6 +104,30 @@ def test_from_fastdataframe_model_type_mismatch() -> None:
     assert error_types["score"] == "TypeMismatch"
 
 
+@mark.parametrize("file_path", [
+    "files/test1.csv",  # every data is present
+    "files/test2.csv",  # 1 row of score is None
+    "files/test3.csv",  # source is having extra columns
+    "files/test4.csv",  # missing whole column 'score' which is Optional
+])
+def test_valid_data_loading(file_path: str):
+    PolarsModel = PolarsFastDataframeModel.from_base_model(BaseModel)
+    polar_schema = PolarsModel.polars_schema()
+    df = pl.read_csv(f"tests/polars/{file_path}",separator=";", schema=polar_schema, truncate_ragged_lines=True)
+    errors = PolarsModel.validate_schema(df)
+    assert len(errors) == 0
+
+
+@mark.parametrize("file_path", [
+    "files/test5.csv" # missing whole column 'is_active' which is required
+])
+def test_invalid_data_loading(file_path: str):
+    PolarsModel = PolarsFastDataframeModel.from_base_model(BaseModel)
+    polar_schema = PolarsModel.polars_schema()
+    df = pl.read_csv(f"tests/polars/{file_path}",separator=";", schema=polar_schema, truncate_ragged_lines=True)
+    errors = PolarsModel.validate_schema(df)
+    assert len(errors) > 0
+
 def test_validate_missing_columns() -> None:
     """Test that validate_schema correctly identifies missing columns."""
     # Create a lazy frame missing 'field2'
@@ -114,6 +139,7 @@ def test_validate_missing_columns() -> None:
     assert errors[0].error_type == "MissingColumn"
     assert errors[0].error_details == "Column field2 is missing in the frame."
 
+
 def test_validate_null_column() -> None:
     """Test that validate_schema correctly identifies missing columns."""
     # Create a lazy frame missing 'field2'
@@ -124,6 +150,7 @@ def test_validate_null_column() -> None:
     assert errors[0].column_name == "field2"
     assert errors[0].error_type == "RequiredColumn"
     assert errors[0].error_details == "Required column contains null in the frame."
+
 
 def test_validate_null_column_with_schema() -> None:
     """Test that validate_schema correctly identifies missing columns."""
