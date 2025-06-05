@@ -4,7 +4,7 @@ from pydantic_to_pyarrow import get_pyarrow_schema
 from fastdataframe.core.model import FastDataframeModel
 from fastdataframe.core.validation import ValidationError
 import polars as pl
-from typing import Any, Type, TypeVar
+from typing import Any, List, Type, TypeVar
 from pydantic import BaseModel, TypeAdapter, create_model
 from fastdataframe.core.json_schema import (
     validate_missing_columns,
@@ -84,5 +84,33 @@ class PolarsFastDataframeModel(FastDataframeModel):
         errors = {}
         errors.update(validate_missing_columns(model_json_schema, df_json_schema))
         errors.update(validate_column_types(model_json_schema, df_json_schema))
+        errors.update(cls.validate_required_columns(model_json_schema["required"], frame))
 
         return list(errors.values())
+    
+    @classmethod
+    def validate_required_columns(
+        cls, required_fields: List[str], frame: pl.LazyFrame | pl.DataFrame
+    ) -> dict[str, ValidationError]:
+        """
+        Validate that required columns in the given Polars LazyFrame or DataFrame do not contain null values.
+        Args:
+            required_fields: List of column names that are required.
+            frame: The Polars LazyFrame or DataFrame to validate.
+
+        Returns:
+            dict[str, ValidationError]: A dictionary where keys are column names and values are ValidationError
+            instances indicating columns that contain null values.
+        """
+        errors = {}
+        null_count = frame.null_count()
+        if isinstance(frame, pl.LazyFrame):
+            null_count = null_count.collect()
+        for field_name in required_fields:
+            if field_name in frame.columns and null_count[field_name].item() > 0:
+                errors[field_name] = ValidationError(
+                    column_name=field_name, 
+                    error_type="RequiredColumn", 
+                    error_details=f"Required column contains null in the frame.",
+                )
+        return errors
