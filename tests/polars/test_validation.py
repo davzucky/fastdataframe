@@ -114,6 +114,30 @@ def test_validate_missing_columns() -> None:
     assert errors[0].error_type == "MissingColumn"
     assert errors[0].error_details == "Column field2 is missing in the frame."
 
+def test_validate_null_column() -> None:
+    """Test that validate_schema correctly identifies missing columns."""
+    # Create a lazy frame missing 'field2'
+    lazy_frame = pl.LazyFrame({"field1": [1, 2, 3], "field2": [None, None, None]})
+
+    errors = TestModel.validate_schema(lazy_frame)
+    assert len(errors) == 1
+    assert errors[0].column_name == "field2"
+    assert errors[0].error_type == "TypeMismatch"
+    assert errors[0].error_details == "Expected type string, but got null."
+
+def test_validate_null_column_with_schema() -> None:
+    """Test that validate_schema correctly identifies missing columns."""
+    # Create a lazy frame (based on schema) missing 'field2'
+    PolarsModel = PolarsFastDataframeModel.from_base_model(TestModel)
+    polar_schema = PolarsModel.polars_schema()
+    lazy_frame = pl.LazyFrame({"field1": [1, 2, 3], "field2": [None, None, None]}, schema=polar_schema)
+
+    errors = TestModel.validate_schema(lazy_frame)
+    assert len(errors) == 1
+    assert errors[0].column_name == "field2"
+    assert errors[0].error_type == "TypeMismatch"
+    assert errors[0].error_details == "Expected type string, but got null."
+
 
 def test_validate_column_types() -> None:
     """Test that validate_schema correctly identifies type mismatches."""
