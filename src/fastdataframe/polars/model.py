@@ -1,5 +1,6 @@
 """PolarsFastDataframeModel implementation."""
 
+from pydantic_to_pyarrow import get_pyarrow_schema
 from fastdataframe.core.model import FastDataframeModel
 from fastdataframe.core.validation import ValidationError
 import polars as pl
@@ -56,6 +57,13 @@ class PolarsFastDataframeModel(FastDataframeModel):
             **field_definitions,
         )  # type: ignore[call-overload]
         return new_model
+
+    @classmethod
+    def polars_schema(cls) -> pl.Schema:
+        """Return a polars dataframe Schema based on the model's fields, supporting Optional types."""
+        pyarrow_schema = get_pyarrow_schema(cls)
+        empty_df = pl.from_arrow(pyarrow_schema.empty_table())
+        return empty_df.schema
 
     @classmethod
     def validate_schema(
