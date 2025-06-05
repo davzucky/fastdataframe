@@ -27,6 +27,8 @@ classifiers = [
 [project.optional-dependencies]
 polars = [
     "polars>=1.26.0",
+    "pyarrow>=20.0.0",
+    "pydantic-to-pyarrow>=0.1.6",
 ]
 iceberg = [
     "pyiceberg>=0.9",
