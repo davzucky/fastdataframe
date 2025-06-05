@@ -122,8 +122,8 @@ def test_validate_null_column() -> None:
     errors = TestModel.validate_schema(lazy_frame)
     assert len(errors) == 1
     assert errors[0].column_name == "field2"
-    assert errors[0].error_type == "TypeMismatch"
-    assert errors[0].error_details == "Expected type string, but got null."
+    assert errors[0].error_type == "RequiredColumn"
+    assert errors[0].error_details == "Required column contains null in the frame."
 
 def test_validate_null_column_with_schema() -> None:
     """Test that validate_schema correctly identifies missing columns."""
