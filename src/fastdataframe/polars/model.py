@@ -84,13 +84,22 @@ class PolarsFastDataframeModel(FastDataframeModel):
         errors = {}
         errors.update(validate_missing_columns(model_json_schema, df_json_schema))
         errors.update(validate_column_types(model_json_schema, df_json_schema))
-        errors.update(cls.validate_required_columns(model_json_schema["required"], frame))
+
+        # only concern the required fields
+        required_fields = [
+            field for field in model_json_schema["required"] 
+            if field not in errors or errors[field].error_type != "MissingColumn"
+        ]
+        frame_with_required_fields = frame.select(required_fields)
+        if isinstance(frame, pl.LazyFrame):
+            frame_with_required_fields = frame_with_required_fields.collect()
+        errors.update(cls.validate_non_null_columns(required_fields, frame_with_required_fields))
 
         return list(errors.values())
     
     @classmethod
-    def validate_required_columns(
-        cls, required_fields: List[str], frame: pl.LazyFrame | pl.DataFrame
+    def validate_non_null_columns(
+        cls, required_fields: List[str], frame: pl.DataFrame
     ) -> dict[str, ValidationError]:
         """
         Validate that required columns in the given Polars LazyFrame or DataFrame do not contain null values.
@@ -103,11 +112,8 @@ class PolarsFastDataframeModel(FastDataframeModel):
             instances indicating columns that contain null values.
         """
         errors = {}
-        null_count = frame.null_count()
-        if isinstance(frame, pl.LazyFrame):
-            null_count = null_count.collect()
         for field_name in required_fields:
-            if field_name in frame.columns and null_count[field_name].item() > 0:
+            if field_name in frame.columns and frame[field_name].has_nulls():
                 errors[field_name] = ValidationError(
                     column_name=field_name, 
                     error_type="RequiredColumn", 
