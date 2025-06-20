@@ -1,10 +1,10 @@
 """PolarsFastDataframeModel implementation."""
 
-from pydantic_to_pyarrow import get_pyarrow_schema
 from fastdataframe.core.model import FastDataframeModel
+from fastdataframe.core.types_helper import is_optional_type
 from fastdataframe.core.validation import ValidationError
 import polars as pl
-from typing import Any, List, Type, TypeVar
+from typing import Annotated, Any, Dict, List, Type, TypeVar, get_args, get_origin
 from pydantic import BaseModel, TypeAdapter, create_model
 from fastdataframe.core.json_schema import (
     validate_missing_columns,
@@ -31,6 +31,25 @@ def _extract_polars_frame_json_schema(frame: pl.LazyFrame | pl.DataFrame) -> dic
         "required": required,
     }
 
+PYTHON_TO_POLARS_TYPE_MAP: Dict[Any, type] = {
+    int: pl.Int64,
+    float: pl.Float64,
+    str: pl.Utf8,
+    bool: pl.Boolean,
+    list: pl.List,
+    dict: pl.Object,
+}
+
+def _python_type_to_polars_type(py_type: Any) -> pl.DataType:
+    origin = get_origin(py_type)
+    if origin is Annotated:
+        py_type = get_args(py_type)[0]
+    # Unwrap Optional/Union[..., NoneType]
+    if is_optional_type(py_type):
+        args = get_args(py_type)
+        # Remove NoneType from Union
+        py_type = next((a for a in args if a is not type(None)), None)
+    return PYTHON_TO_POLARS_TYPE_MAP.get(py_type, pl.Utf8)
 
 class PolarsFastDataframeModel(FastDataframeModel):
     """A model that extends FastDataframeModel for Polars integration."""
@@ -60,10 +79,15 @@ class PolarsFastDataframeModel(FastDataframeModel):
 
     @classmethod
     def polars_schema(cls) -> pl.Schema:
-        """Return a polars dataframe Schema based on the model's fields, supporting Optional types."""
-        pyarrow_schema = get_pyarrow_schema(cls)
-        empty_df = pl.from_arrow(pyarrow_schema.empty_table())
-        return empty_df.schema
+        """Return a polars dataframe Schema based on the model's fields, supporting Optional/ Annotation syntax."""
+        schema = {}
+
+        for field_name, model_field in cls.model_fields.items():
+            py_type = model_field.annotation
+            polars_type = _python_type_to_polars_type(py_type)
+            schema[field_name] = polars_type
+        return pl.Schema(schema)
+        
 
     @classmethod
     def validate_schema(
