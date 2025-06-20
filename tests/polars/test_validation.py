@@ -110,13 +110,18 @@ def test_from_fastdataframe_model_type_mismatch() -> None:
     "files/test3.csv",  # source is having extra columns
     "files/test4.csv",  # missing whole column 'score' which is Optional
 ])
-def test_valid_data_loading(file_path: str):
+def test_valid_data_loading_from_csv(file_path: str):
     PolarsModel = PolarsFastDataframeModel.from_base_model(BaseModel)
     polar_schema = PolarsModel.polars_schema()
     df = pl.read_csv(f"tests/polars/{file_path}",separator=";", schema=polar_schema, truncate_ragged_lines=True)
     errors = PolarsModel.validate_schema(df)
     assert len(errors) == 0
 
+def test_valid_data_loading():
+    PolarsModel = PolarsFastDataframeModel.from_base_model(BaseModel)
+    df = pl.DataFrame({"name": "John Doe", "age": 10, "is active": True})
+    errors = PolarsModel.validate_schema(df)
+    assert len(errors) == 0
 
 @mark.parametrize("file_path", [
     "files/test5.csv" # missing whole column 'is_active' which is required
