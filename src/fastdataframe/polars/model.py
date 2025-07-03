@@ -83,9 +83,9 @@ class PolarsFastDataframeModel(FastDataframeModel):
     @classmethod
     def get_polars_schema(cls) -> pl.Schema:
         """Get the polars schema for the model."""
-        schema = {}
-
-        for field_name, field_type in cls.__annotations__.items():
-            schema[field_name] = get_polars_type(field_type)
-
-        return pl.Schema(schema)
+        return pl.Schema(
+            {
+                field_name: get_polars_type(field_type)
+                for field_name, field_type in cls.__annotations__.items()
+            }
+        )
