@@ -3,12 +3,13 @@
 from fastdataframe.core.model import FastDataframeModel
 from fastdataframe.core.validation import ValidationError
 import polars as pl
-from typing import Any, Type, TypeVar
+from typing import Any, Type, TypeVar, Annotated, get_args, get_origin
 from pydantic import BaseModel, TypeAdapter, create_model
 from fastdataframe.core.json_schema import (
     validate_missing_columns,
     validate_column_types,
 )
+from fastdataframe.polars._types import get_polars_type
 
 T = TypeVar("T", bound="PolarsFastDataframeModel")
 
@@ -78,3 +79,13 @@ class PolarsFastDataframeModel(FastDataframeModel):
         errors.update(validate_column_types(model_json_schema, df_json_schema))
 
         return list(errors.values())
+
+    @classmethod
+    def get_polars_schema(cls) -> pl.Schema:
+        """Get the polars schema for the model."""
+        schema = {}
+
+        for field_name, field_type in cls.__annotations__.items():
+            schema[field_name] = get_polars_type(field_type)
+
+        return pl.Schema(schema)

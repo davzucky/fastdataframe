@@ -2,9 +2,10 @@
 
 import polars as pl
 import datetime as dt
+
 from fastdataframe.polars.model import PolarsFastDataframeModel
 
-from tests.test_models import BaseModel, TemporalModel
+from tests.test_models import UserTestModel, TemporalModel
 
 
 class TestModel(PolarsFastDataframeModel):
@@ -14,11 +15,14 @@ class TestModel(PolarsFastDataframeModel):
     field2: str
 
 
+# tesmodel.column.field1
+
+
 def test_from_fastdataframe_model_basic_conversion() -> None:
     """Test basic conversion of FastDataframeModel to PolarsFastDataframeModel."""
 
     # Convert to PolarsFastDataframeModel
-    PolarsModel = PolarsFastDataframeModel.from_base_model(BaseModel)
+    PolarsModel = PolarsFastDataframeModel.from_base_model(UserTestModel)
 
     print("PolarsModel.__dict__:", PolarsModel.__dict__)
 
@@ -26,16 +30,16 @@ def test_from_fastdataframe_model_basic_conversion() -> None:
     assert issubclass(PolarsModel, PolarsFastDataframeModel)
 
     # Verify the class name is correct
-    assert PolarsModel.__name__ == "BaseModelPolars"
+    assert PolarsModel.__name__ == "UserTestModelPolars"
 
     # Verify all fields are preserved
-    assert PolarsModel.__annotations__ == BaseModel.__annotations__
+    assert PolarsModel.__annotations__ == UserTestModel.__annotations__
 
     # Verify the docstring is updated
-    assert PolarsModel.__doc__ == "Polars version of BaseModel"
+    assert PolarsModel.__doc__ == "Polars version of UserTestModel"
 
     polars_json_schema = PolarsModel.model_json_schema()
-    base_json_shema = BaseModel.model_json_schema()
+    base_json_shema = UserTestModel.model_json_schema()
     assert polars_json_schema["properties"] == base_json_shema["properties"]
     assert polars_json_schema["required"] == base_json_shema["required"]
 
@@ -43,7 +47,7 @@ def test_from_fastdataframe_model_basic_conversion() -> None:
 def test_from_fastdataframe_model_valid_frame() -> None:
     """Test validation of a valid frame with the converted model."""
 
-    PolarsModel = PolarsFastDataframeModel.from_base_model(BaseModel)
+    PolarsModel = PolarsFastDataframeModel.from_base_model(UserTestModel)
 
     # Test validation with a valid frame
     valid_frame = pl.LazyFrame(
@@ -61,7 +65,7 @@ def test_from_fastdataframe_model_valid_frame() -> None:
 def test_from_fastdataframe_model_missing_optional() -> None:
     """Test validation of a frame missing an optional field."""
 
-    PolarsModel = PolarsFastDataframeModel.from_base_model(BaseModel)
+    PolarsModel = PolarsFastDataframeModel.from_base_model(UserTestModel)
 
     # Test validation with an invalid frame (missing required field)
     invalid_frame = pl.LazyFrame(
@@ -69,7 +73,7 @@ def test_from_fastdataframe_model_missing_optional() -> None:
             "name": ["John", "Jane"],
             "age": [30, 25],
             "is_active": [True, False],
-            # score is missing but it's optional
+            # scortest_get_polars_schema_with_annotated_typese is missing but it's optional
         }
     )
     errors = PolarsModel.validate_schema(invalid_frame)
@@ -81,7 +85,7 @@ def test_from_fastdataframe_model_missing_optional() -> None:
 def test_from_fastdataframe_model_type_mismatch() -> None:
     """Test validation of a frame with type mismatches."""
 
-    PolarsModel = PolarsFastDataframeModel.from_base_model(BaseModel)
+    PolarsModel = PolarsFastDataframeModel.from_base_model(UserTestModel)
 
     # Test validation with type mismatch
     type_mismatch_frame = pl.LazyFrame(
@@ -107,7 +111,6 @@ def test_validate_missing_columns() -> None:
     """Test that validate_schema correctly identifies missing columns."""
     # Create a lazy frame missing 'field2'
     lazy_frame = pl.LazyFrame({"field1": [1, 2, 3]})
-
     errors = TestModel.validate_schema(lazy_frame)
     assert len(errors) == 1
     assert errors[0].column_name == "field2"
