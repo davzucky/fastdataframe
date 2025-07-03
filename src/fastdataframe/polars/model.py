@@ -89,3 +89,13 @@ class PolarsFastDataframeModel(FastDataframeModel):
                 for field_name, field_type in cls.__annotations__.items()
             }
         )
+
+    @classmethod
+    def get_stringified_schema(cls) -> pl.Schema:
+        """Get the polars schema for the model with all columns as strings."""
+        return pl.Schema(
+            {
+                field_name: pl.String
+                for field_name in cls.__annotations__.keys()
+            }
+        )

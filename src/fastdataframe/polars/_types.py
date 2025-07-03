@@ -3,7 +3,7 @@ import polars as pl
 import inspect
 
 
-def get_polars_type(field_type: Any) -> pl.PolarsDataType:
+def get_polars_type(field_type: Any) -> pl.DataType | pl.DataTypeClass:
     if get_origin(field_type) is not Annotated:
         return pl.DataType.from_python(field_type)
 
