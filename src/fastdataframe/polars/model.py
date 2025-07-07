@@ -14,6 +14,7 @@ from fastdataframe.polars._types import get_polars_type
 T = TypeVar("T", bound="PolarsFastDataframeModel")
 TFrame = TypeVar("TFrame", bound=pl.DataFrame | pl.LazyFrame)
 
+
 def _extract_polars_frame_json_schema(frame: pl.LazyFrame | pl.DataFrame) -> dict:
     """
     Given a Polars LazyFrame or DataFrame, return a JSON schema compatible dict for the frame.
@@ -94,10 +95,7 @@ class PolarsFastDataframeModel(FastDataframeModel):
     def get_stringified_schema(cls) -> pl.Schema:
         """Get the polars schema for the model with all columns as strings."""
         return pl.Schema(
-            {
-                field_name: pl.String
-                for field_name in cls.__annotations__.keys()
-            }
+            {field_name: pl.String for field_name in cls.__annotations__.keys()}
         )
 
     @classmethod
