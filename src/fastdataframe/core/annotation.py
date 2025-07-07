@@ -1,7 +1,7 @@
 """Annotation classes for FastDataframe."""
 
 from dataclasses import dataclass
-from typing import Any, Self, cast
+from typing import Any, Optional, Self, cast
 from pydantic._internal._fields import PydanticMetadata
 from annotated_types import BaseMetadata
 
@@ -18,6 +18,8 @@ class ColumnInfo(PydanticMetadata, BaseMetadata):
     """
 
     is_unique: bool = False
+    bool_true_string: Optional[str] = None
+    bool_false_string: Optional[str] = None
 
     def __get_pydantic_core_schema__(
         self, source_type: Any, handler: Any

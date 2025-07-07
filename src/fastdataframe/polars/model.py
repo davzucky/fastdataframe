@@ -3,7 +3,7 @@
 from fastdataframe.core.model import FastDataframeModel
 from fastdataframe.core.validation import ValidationError
 import polars as pl
-from typing import Any, Type, TypeVar, Annotated, get_args, get_origin
+from typing import Any, Type, TypeVar, Annotated, get_args, get_origin, Union
 from pydantic import BaseModel, TypeAdapter, create_model
 from fastdataframe.core.json_schema import (
     validate_missing_columns,
@@ -12,7 +12,7 @@ from fastdataframe.core.json_schema import (
 from fastdataframe.polars._types import get_polars_type
 
 T = TypeVar("T", bound="PolarsFastDataframeModel")
-
+TFrame = TypeVar("TFrame", bound=pl.DataFrame | pl.LazyFrame)
 
 def _extract_polars_frame_json_schema(frame: pl.LazyFrame | pl.DataFrame) -> dict:
     """
@@ -99,3 +99,11 @@ class PolarsFastDataframeModel(FastDataframeModel):
                 for field_name in cls.__annotations__.keys()
             }
         )
+
+    @classmethod
+    def cast_to_model_schema(
+        cls, df: Union[pl.DataFrame, pl.LazyFrame]
+    ) -> Union[pl.DataFrame, pl.LazyFrame]:
+        """Cast DataFrame or LazyFrame columns to match the model's schema types."""
+        schema = cls.get_polars_schema()
+        return df.cast({k: v for k, v in schema.items()})
