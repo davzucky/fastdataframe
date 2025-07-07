@@ -19,7 +19,9 @@ class TestColumnInfo:
     def test_fastdataframe_schema_generation(self) -> None:
         """Test that FastDataframe generates correct schema."""
         metadata = ColumnInfo(is_unique=True)
-        schema = metadata.__get_pydantic_core_schema__(int, lambda x: {"type": "integer"})
+        schema = metadata.__get_pydantic_core_schema__(
+            int, lambda x: {"type": "integer"}
+        )
 
         # Check that json_schema_extra contains our metadata
         assert "json_schema_extra" in schema
@@ -97,7 +99,9 @@ class TestColumnInfo:
             }
         }
 
-        with pytest.raises(ValueError, match="Missing required properties: {'is_unique'}"):
+        with pytest.raises(
+            ValueError, match="Missing required properties: {'is_unique'}"
+        ):
             ColumnInfo.from_schema(schema)
 
     def test_fastdataframe_immutability(self) -> None:

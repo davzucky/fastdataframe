@@ -4,6 +4,7 @@ from pydantic import TypeAdapter
 import datetime as dt
 from decimal import Decimal
 
+
 class TestJsonSchemaIsSubset:
     @pytest.mark.parametrize(
         "left_type, right_type, expected_result",
@@ -17,7 +18,11 @@ class TestJsonSchemaIsSubset:
             (str, str, True),
             (str, int, False),
             (str | None, str, True),
-            (dt.date, str, False),  # date serializes as string, but should require format
+            (
+                dt.date,
+                str,
+                False,
+            ),  # date serializes as string, but should require format
             (
                 dt.datetime,
                 str,
@@ -48,7 +53,9 @@ class TestJsonSchemaIsSubset:
             (int | float | str, int | float, True),
         ],
     )
-    def test_json_schema_is_subset_param(self, left_type: type, right_type: type, expected_result: bool) -> None:
+    def test_json_schema_is_subset_param(
+        self, left_type: type, right_type: type, expected_result: bool
+    ) -> None:
         left_schema = TypeAdapter(left_type).json_schema()
         right_schema = TypeAdapter(right_type).json_schema()
         assert json_schema_is_subset(left_schema, right_schema) is expected_result

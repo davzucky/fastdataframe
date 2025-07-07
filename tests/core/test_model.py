@@ -71,7 +71,12 @@ class TestFastDataframeModel:
             ({"test_field": (Annotated[Optional[str], Field()], None)}, True, False),
         ],
     )
-    def test_model_base_type(self, field_type: dict[str, Any], expected_is_nullable: bool, expected_is_unique: bool) -> None:
+    def test_model_base_type(
+        self,
+        field_type: dict[str, Any],
+        expected_is_nullable: bool,
+        expected_is_unique: bool,
+    ) -> None:
         """Test that model fields have correct nullability (via required) and is_unique properties based on their type."""
         # class MyModel(FastDataframeModel):
         my_model = create_model("my_model", __base__=FastDataframeModel, **field_type)

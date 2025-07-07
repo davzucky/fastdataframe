@@ -4,6 +4,7 @@ import inspect
 
 type PolarsType = pl.DataType | pl.DataTypeClass
 
+
 def get_polars_type(field_type: Any) -> PolarsType:
     if get_origin(field_type) is not Annotated:
         return pl.DataType.from_python(field_type)
