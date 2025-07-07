@@ -1,6 +1,8 @@
 from typing import Annotated
 import polars as pl
 from fastdataframe.polars.model import PolarsFastDataframeModel
+import datetime as dt
+from tests.test_models import UserTestModel, TemporalModel
 
 
 class TestGetPolarsSchema:
@@ -258,3 +260,104 @@ class TestCastToModelSchema:
         lf = pl.LazyFrame({"x": ["1", "2"], "y": ["a", "b"]})
         result_lf = TestModel.cast_to_model_schema(lf)
         assert isinstance(result_lf, pl.LazyFrame)
+
+
+class TestPolarsValidation:
+    class TestModel(PolarsFastDataframeModel):
+        __test__ = False
+        field1: int
+        field2: str
+
+    def test_from_fastdataframe_model_basic_conversion(self) -> None:
+        PolarsModel = PolarsFastDataframeModel.from_base_model(UserTestModel)
+        assert issubclass(PolarsModel, PolarsFastDataframeModel)
+        assert PolarsModel.__name__ == "UserTestModelPolars"
+        assert PolarsModel.__annotations__ == UserTestModel.__annotations__
+        assert PolarsModel.__doc__ == "Polars version of UserTestModel"
+        polars_json_schema = PolarsModel.model_json_schema()
+        base_json_shema = UserTestModel.model_json_schema()
+        assert polars_json_schema["properties"] == base_json_shema["properties"]
+        assert polars_json_schema["required"] == base_json_shema["required"]
+
+    def test_from_fastdataframe_model_valid_frame(self) -> None:
+        PolarsModel = PolarsFastDataframeModel.from_base_model(UserTestModel)
+        valid_frame = pl.LazyFrame(
+            {
+                "name": ["John", "Jane"],
+                "age": [30, 25],
+                "is_active": [True, False],
+                "score": [95.5, None],
+            }
+        )
+        errors = PolarsModel.validate_schema(valid_frame)
+        assert len(errors) == 0
+
+    def test_from_fastdataframe_model_missing_optional(self) -> None:
+        PolarsModel = PolarsFastDataframeModel.from_base_model(UserTestModel)
+        invalid_frame = pl.LazyFrame(
+            {
+                "name": ["John", "Jane"],
+                "age": [30, 25],
+                "is_active": [True, False],
+            }
+        )
+        errors = PolarsModel.validate_schema(invalid_frame)
+        assert len(errors) == 0
+
+    def test_from_fastdataframe_model_type_mismatch(self) -> None:
+        PolarsModel = PolarsFastDataframeModel.from_base_model(UserTestModel)
+        type_mismatch_frame = pl.LazyFrame(
+            {
+                "name": ["John", "Jane"],
+                "age": ["30", "25"],
+                "is_active": [True, False],
+                "score": ["95.5", None],
+            }
+        )
+        errors = PolarsModel.validate_schema(type_mismatch_frame)
+        assert len(errors) == 2
+        error_types = {error.column_name: error.error_type for error in errors}
+        assert "age" in error_types
+        assert "score" in error_types
+        assert error_types["age"] == "TypeMismatch"
+        assert error_types["score"] == "TypeMismatch"
+
+    def test_validate_missing_columns(self) -> None:
+        lazy_frame = pl.LazyFrame({"field1": [1, 2, 3]})
+        errors = TestPolarsValidation.TestModel.validate_schema(lazy_frame)
+        assert len(errors) == 1
+        assert errors[0].column_name == "field2"
+        assert errors[0].error_type == "MissingColumn"
+        assert errors[0].error_details == "Column field2 is missing in the frame."
+
+    def test_validate_column_types(self) -> None:
+        lazy_frame = pl.LazyFrame(
+            {"field1": ["1", "2", "3"], "field2": ["a", "b", "c"]}
+        )
+        errors = TestPolarsValidation.TestModel.validate_schema(lazy_frame)
+        assert len(errors) == 1
+        assert errors[0].column_name == "field1"
+        assert errors[0].error_type == "TypeMismatch"
+        assert errors[0].error_details == "Expected type integer, but got string."
+
+    def test_validate_schema_valid_frame(self) -> None:
+        lazy_frame = pl.LazyFrame({"field1": [1, 2, 3], "field2": ["a", "b", "c"]})
+        errors = TestPolarsValidation.TestModel.validate_schema(lazy_frame)
+        assert len(errors) == 0
+
+    def test_polarsfastdataframemodel_with_temporal_types(self) -> None:
+        PolarsModel = PolarsFastDataframeModel.from_base_model(TemporalModel)
+        today = dt.date.today()
+        now = dt.datetime.now()
+        t = now.time()
+        td_ = dt.timedelta(days=1, hours=2)
+        frame = pl.LazyFrame(
+            {
+                "d": [today, today],
+                "dt_": [now, now],
+                "t": [t, t],
+                "td": [td_, td_],
+            }
+        )
+        errors = PolarsModel.validate_schema(frame)
+        assert len(errors) == 0
