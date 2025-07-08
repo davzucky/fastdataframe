@@ -1,6 +1,10 @@
 from pydantic import BaseModel, create_model
 from fastdataframe.core.json_schema import validate_missing_columns
-from fastdataframe.core.model import FastDataframeModel
+from fastdataframe.core.model import AliasType, FastDataframeModel
+from fastdataframe.core.pydantic.field_info import (
+    get_serialization_alias,
+    get_validation_alias,
+)
 from fastdataframe.core.validation import ValidationError
 from typing import Any, List, Type, TypeVar, get_args, get_origin, Annotated
 from pyiceberg.table import Table
@@ -85,8 +89,14 @@ class IcebergFastDataframeModel(FastDataframeModel):
         return new_model
 
     @classmethod
-    def iceberg_schema(cls) -> Schema:
+    def iceberg_schema(cls, alias_type: AliasType = "serialization") -> Schema:
         """Return a pyiceberg Schema based on the model's fields, supporting Optional types."""
+        alias_func = (
+            get_serialization_alias
+            if alias_type == "serialization"
+            else get_validation_alias
+        )
+
         fields = []
         for idx, (field_name, model_field) in enumerate(cls.model_fields.items(), 1):
             py_type = model_field.annotation
@@ -95,7 +105,7 @@ class IcebergFastDataframeModel(FastDataframeModel):
             fields.append(
                 NestedField(
                     field_id=idx,
-                    name=field_name,
+                    name=alias_func(cls.__pydantic_fields__[field_name], field_name),
                     field_type=iceberg_type,
                     required=not nullable,
                 )
