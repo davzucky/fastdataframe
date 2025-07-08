@@ -1,6 +1,6 @@
 """FastDataframe model implementation."""
 
-from typing import Any, TypeVar, Annotated, get_args, get_origin
+from typing import Any, Literal, TypeVar, Annotated, get_args, get_origin
 
 from pydantic import BaseModel
 from pydantic._internal._model_construction import (
@@ -11,6 +11,7 @@ from .annotation import ColumnInfo
 from .types_helper import contains_type
 
 T = TypeVar("T", bound="FastDataframeModel")
+AliasType = Literal["serialization", "validation"]
 
 
 class FastDataframeModelMetaclass(PydanticModelMetaclass):

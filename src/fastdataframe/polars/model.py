@@ -1,9 +1,13 @@
 """PolarsFastDataframeModel implementation."""
 
-from fastdataframe.core.model import FastDataframeModel
+from fastdataframe.core.model import AliasType, FastDataframeModel
+from fastdataframe.core.pydantic.field_info import (
+    get_serialization_alias,
+    get_validation_alias,
+)
 from fastdataframe.core.validation import ValidationError
 import polars as pl
-from typing import Any, Type, TypeVar, Annotated, get_args, get_origin, Union
+from typing import Any, Type, TypeVar, Union
 from pydantic import BaseModel, TypeAdapter, create_model
 from fastdataframe.core.json_schema import (
     validate_missing_columns,
@@ -82,20 +86,37 @@ class PolarsFastDataframeModel(FastDataframeModel):
         return list(errors.values())
 
     @classmethod
-    def get_polars_schema(cls) -> pl.Schema:
+    def get_polars_schema(cls, alias_type: AliasType = "serialization") -> pl.Schema:
         """Get the polars schema for the model."""
+        alias_func = (
+            get_serialization_alias
+            if alias_type == "serialization"
+            else get_validation_alias
+        )
         return pl.Schema(
             {
-                field_name: get_polars_type(field_type)
+                alias_func(
+                    cls.__pydantic_fields__[field_name], field_name
+                ): get_polars_type(field_type)
                 for field_name, field_type in cls.__annotations__.items()
             }
         )
 
     @classmethod
-    def get_stringified_schema(cls) -> pl.Schema:
+    def get_stringified_schema(
+        cls, alias_type: AliasType = "serialization"
+    ) -> pl.Schema:
         """Get the polars schema for the model with all columns as strings."""
+        alias_func = (
+            get_serialization_alias
+            if alias_type == "serialization"
+            else get_validation_alias
+        )
         return pl.Schema(
-            {field_name: pl.String for field_name in cls.__annotations__.keys()}
+            {
+                alias_func(cls.__pydantic_fields__[field_name], field_name): pl.String
+                for field_name in cls.__annotations__.keys()
+            }
         )
 
     @classmethod

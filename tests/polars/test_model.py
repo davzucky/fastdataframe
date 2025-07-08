@@ -1,5 +1,6 @@
 from typing import Annotated
 import polars as pl
+from pydantic import Field
 from fastdataframe.polars.model import PolarsFastDataframeModel
 import datetime as dt
 from tests.test_models import UserTestModel, TemporalModel
@@ -12,6 +13,38 @@ class TestGetPolarsSchema:
             b: str
 
         assert TestModel.get_polars_schema() == pl.Schema({"a": pl.Int64, "b": pl.Utf8})
+
+    def test_get_polars_schema_with_alias_serialization(self) -> None:
+        class TestModel(PolarsFastDataframeModel):
+            a_alias: Annotated[str, Field(alias="aAlias")]
+            a_alias_serialize: Annotated[
+                str, Field(serialization_alias="aliasSerialize")
+            ]
+            a_alias_validate: Annotated[str, Field(validation_alias="aliasValidate")]
+
+        assert TestModel.get_polars_schema("serialization") == pl.Schema(
+            {
+                "aAlias": pl.String,
+                "aliasSerialize": pl.String,
+                "a_alias_validate": pl.String,
+            }
+        )
+
+    def test_get_polars_schema_with_alias_validation(self) -> None:
+        class TestModel(PolarsFastDataframeModel):
+            a_alias: Annotated[str, Field(alias="aAlias")]
+            a_alias_serialize: Annotated[
+                str, Field(serialization_alias="aliasSerialize")
+            ]
+            a_alias_validate: Annotated[str, Field(validation_alias="aliasValidate")]
+
+        assert TestModel.get_polars_schema("validation") == pl.Schema(
+            {
+                "aAlias": pl.String,
+                "a_alias_serialize": pl.String,
+                "aliasValidate": pl.String,
+            }
+        )
 
     def test_get_polars_schema_with_annotated_polars_types(self) -> None:
         class TestModel(PolarsFastDataframeModel):
