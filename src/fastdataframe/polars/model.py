@@ -120,9 +120,72 @@ class PolarsFastDataframeModel(FastDataframeModel):
         )
 
     @classmethod
+    def rename(
+        cls,
+        df: pl.DataFrame | pl.LazyFrame,
+        alias_type_from: AliasType = "serialization",
+        alias_type_to: AliasType = "serialization",
+    ) -> pl.DataFrame | pl.LazyFrame:
+        """Rename dataframe columns between different alias types according to the model's schema.
+
+        This method allows converting column names between validation aliases (used during data validation)
+        and serialization aliases (used for storage/export). It maintains the model's schema constraints
+        while adapting to different naming conventions.
+
+        Args:
+            df: Polars DataFrame or LazyFrame to rename columns on
+            alias_type_from: The alias type currently used in the input dataframe columns.
+                - 'serialization' for storage/export names
+                - 'validation' for validation/processing names
+            alias_type_to: The target alias type to convert column names to.
+                Uses same options as alias_type_from.
+
+        Returns:
+            pl.DataFrame | pl.LazyFrame: New dataframe with renamed columns. Maintains original type
+            (eager DataFrame or LazyFrame) of input.
+
+        Raises:
+            KeyError: If any existing column name is not found in the model's schema
+
+        Example:
+            ```python
+            # Convert from database column names to validation names
+            df = MyModel.rename(df, alias_type_from='serialization', alias_type_to='validation')
+
+            # Convert back to serialization names for storage
+            df = MyModel.rename(df, alias_type_from='validation', alias_type_to='serialization')
+            ```
+        """
+        alias_func_from = (
+            get_serialization_alias
+            if alias_type_from == "serialization"
+            else get_validation_alias
+        )
+        alias_func_to = (
+            get_serialization_alias
+            if alias_type_to == "serialization"
+            else get_validation_alias
+        )
+        model_map = {
+            alias_func_from(field_info, field_name): alias_func_to(
+                field_info, field_name
+            )
+            for field_name, field_info in cls.__pydantic_fields__.items()
+        }
+        df_schema = df.collect_schema()
+        rename_map = {
+            field_name: model_map[field_name]
+            for field_name in df_schema.keys()
+            if field_name in model_map
+        }
+        return df.rename(rename_map)
+
+    @classmethod
     def cast_to_model_schema(
-        cls, df: Union[pl.DataFrame, pl.LazyFrame]
+        cls,
+        df: Union[pl.DataFrame, pl.LazyFrame],
+        alias_type: AliasType = "serialization",
     ) -> Union[pl.DataFrame, pl.LazyFrame]:
         """Cast DataFrame or LazyFrame columns to match the model's schema types."""
-        schema = cls.get_polars_schema()
+        schema = cls.get_polars_schema(alias_type)
         return df.cast({k: v for k, v in schema.items()})

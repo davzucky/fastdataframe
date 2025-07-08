@@ -394,3 +394,107 @@ class TestPolarsValidation:
         )
         errors = PolarsModel.validate_schema(frame)
         assert len(errors) == 0
+
+
+class TestRename:
+    def test_rename_serialization_to_validation(self) -> None:
+        class TestModel(PolarsFastDataframeModel):
+            a: int
+            b: str
+            c: Annotated[
+                int, Field(validation_alias="val_c", serialization_alias="ser_c")
+            ]
+
+        df = pl.DataFrame(
+            {
+                "a": [1],
+                "b": ["x"],
+                "ser_c": [42],
+            }
+        )
+
+        renamed = df.pipe(
+            TestModel.rename,
+            alias_type_from="serialization",
+            alias_type_to="validation",
+        )
+        assert isinstance(renamed, pl.DataFrame)
+        assert set(renamed.columns) == {"a", "b", "val_c"}
+        assert renamed["val_c"][0] == 42
+
+    def test_rename_validation_to_serialization(self) -> None:
+        class TestModel(PolarsFastDataframeModel):
+            a: int
+            b: str
+            c: Annotated[
+                int, Field(validation_alias="val_c", serialization_alias="ser_c")
+            ]
+
+        df = pl.DataFrame(
+            {
+                "a": [1],
+                "b": ["x"],
+                "val_c": [99],
+            }
+        )
+        renamed = df.pipe(
+            TestModel.rename,
+            alias_type_from="validation",
+            alias_type_to="serialization",
+        )
+        assert isinstance(renamed, pl.DataFrame)
+
+        assert set(renamed.columns) == {"a", "b", "ser_c"}
+        assert renamed["ser_c"][0] == 99
+
+    def test_rename_identity_when_no_alias(self) -> None:
+        class TestModel(PolarsFastDataframeModel):
+            x: int
+            y: str
+
+        df = pl.DataFrame({"x": [1], "y": ["foo"]})
+        renamed = df.pipe(TestModel.rename)
+        assert isinstance(renamed, pl.DataFrame)
+
+        assert set(renamed.columns) == {"x", "y"}
+        assert renamed["x"][0] == 1
+        assert renamed["y"][0] == "foo"
+
+    def test_rename_with_missing_columns(self) -> None:
+        class TestModel(PolarsFastDataframeModel):
+            a: int
+            b: str
+            c: Annotated[
+                int, Field(validation_alias="val_c", serialization_alias="ser_c")
+            ]
+
+        df = pl.DataFrame({"a": [1], "ser_c": [2]})
+        renamed = df.pipe(
+            TestModel.rename,
+            alias_type_from="serialization",
+            alias_type_to="validation",
+        )
+        # Only columns present in both df and model mapping are renamed
+        assert isinstance(renamed, pl.DataFrame)
+        assert set(renamed.columns) == {"a", "val_c"}
+        assert renamed["a"][0] == 1
+        assert renamed["val_c"][0] == 2
+
+    def test_rename_lazyframe(self) -> None:
+        class TestModel(PolarsFastDataframeModel):
+            foo: int
+            bar: Annotated[
+                str, Field(validation_alias="baz", serialization_alias="qux")
+            ]
+
+        lf = pl.LazyFrame({"foo": [1], "qux": ["hello"]})
+        renamed = lf.pipe(
+            TestModel.rename,
+            alias_type_from="serialization",
+            alias_type_to="validation",
+        )
+        assert isinstance(renamed, pl.LazyFrame)
+        collected = renamed.collect()
+        assert set(collected.columns) == {"foo", "baz"}
+        assert collected["foo"][0] == 1
+        assert collected["baz"][0] == "hello"
