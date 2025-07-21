@@ -187,7 +187,79 @@ class PolarsFastDataframeModel(FastDataframeModel):
         df: Union[pl.DataFrame, pl.LazyFrame],
         alias_type: AliasType = "serialization",
     ) -> Union[pl.DataFrame, pl.LazyFrame]:
-        """Cast DataFrame or LazyFrame columns to match the model's schema types."""
+        """Cast DataFrame or LazyFrame columns to match the model's schema types.
+
+        This method performs type casting on Polars DataFrame or LazyFrame columns to ensure
+        they match the expected types defined in the model's schema. It uses intelligent
+        casting functions that handle both simple type conversions and complex transformations
+        based on the model's field annotations and metadata.
+
+        The method supports both eager DataFrames and lazy LazyFrames, maintaining the
+        original type in the return value. It only casts columns that have different types
+        between the source and target schemas, skipping columns that already match.
+
+        Args:
+            df: Polars DataFrame or LazyFrame to cast columns on. The method maintains
+                the original type (eager DataFrame or LazyFrame) in the return value.
+            alias_type: The alias type to use for column name resolution.
+                - 'serialization' (default): Use serialization aliases for column names
+                - 'validation': Use validation aliases for column names
+
+        Returns:
+            Union[pl.DataFrame, pl.LazyFrame]: New dataframe with cast columns. Maintains
+            the original type (eager DataFrame or LazyFrame) of the input.
+
+        Raises:
+            ValueError: If any column required by the model's schema is not found in
+                the source dataframe. For lazy frames, the error is raised when the dataframe is collected.
+
+        Example:
+            ```python
+            from fastdataframe import PolarsFastDataframeModel, ColumnInfo
+            from typing import Annotated
+            import polars as pl
+            from pydantic import Field
+
+            # Define a model with custom casting metadata
+            class UserModel(PolarsFastDataframeModel):
+                id: int
+                name: str
+                is_active: Annotated[bool, ColumnInfo(
+                    bool_true_string="yes",
+                    bool_false_string="no"
+                )]
+                birth_date: Annotated[datetime.date, ColumnInfo(
+                    date_format="%Y-%m-%d"
+                )]
+
+            # Create a dataframe with string columns that need casting
+            df = pl.DataFrame({
+                "id": ["1", "2", "3"],
+                "name": ["Alice", "Bob", "Charlie"],
+                "is_active": ["yes", "no", "yes"],
+                "birth_date": ["1990-01-15", "1985-03-20", "1992-07-10"]
+            })
+
+            # Cast the dataframe to match the model's schema
+            cast_df = UserModel.cast(df)
+            
+            # The resulting dataframe will have:
+            # - id: Int64 (cast from String)
+            # - name: String (no change needed)
+            # - is_active: Boolean (cast from String using custom true/false strings)
+            # - birth_date: Date (cast from String using custom date format)
+            ```
+
+        Notes:
+            - The method uses custom casting functions for specific type combinations
+              (e.g., String to Boolean with custom true/false strings, String to Date
+              with custom date formats)
+            - For type combinations without custom functions, it falls back to Polars'
+              built-in casting with strict=True
+            - Columns that already match the target type are skipped for efficiency
+            - The method preserves the original dataframe's structure and only modifies
+              column types as needed
+        """
         source_schema = df.collect_schema()
         target_schema = cls.get_polars_schema(alias_type)
         column_infos = cls.get_column_infos(alias_type)
