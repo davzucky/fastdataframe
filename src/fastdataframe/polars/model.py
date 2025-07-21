@@ -13,6 +13,7 @@ from fastdataframe.core.json_schema import (
     validate_missing_columns,
     validate_column_types,
 )
+from fastdataframe.polars._cast_functions import custom_cast_functions, simple_cast
 from fastdataframe.polars._types import get_polars_type
 
 T = TypeVar("T", bound="PolarsFastDataframeModel")
@@ -181,11 +182,36 @@ class PolarsFastDataframeModel(FastDataframeModel):
         return df.rename(rename_map)
 
     @classmethod
-    def cast_to_model_schema(
+    def cast(
         cls,
         df: Union[pl.DataFrame, pl.LazyFrame],
         alias_type: AliasType = "serialization",
     ) -> Union[pl.DataFrame, pl.LazyFrame]:
         """Cast DataFrame or LazyFrame columns to match the model's schema types."""
-        schema = cls.get_polars_schema(alias_type)
-        return df.cast({k: v for k, v in schema.items()})
+        source_schema = df.collect_schema()
+        target_schema = cls.get_polars_schema(alias_type)
+        column_infos = cls.get_column_infos(alias_type)
+        cast_functions = []
+
+        for target_col, target_type in target_schema.items():
+            if target_col not in source_schema:
+                raise ValueError(f"Column {target_col} not found in source schema")
+            if source_schema[target_col] == target_type:
+                continue
+            cast_function = custom_cast_functions.get(
+                (type(source_schema[target_col]), type(target_type)),
+                simple_cast
+            )
+
+            cast_functions.append(
+                cast_function(
+                    source_schema[target_col],
+                    target_type,
+                    target_col,
+                    column_infos[target_col],
+                )
+            )
+
+        df = df.with_columns(cast_functions)
+
+        return df

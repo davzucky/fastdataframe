@@ -1,6 +1,7 @@
 from typing import Annotated
 import polars as pl
 from pydantic import Field
+from fastdataframe.core.annotation import ColumnInfo
 from fastdataframe.polars.model import PolarsFastDataframeModel
 import datetime as dt
 from tests.test_models import UserTestModel, TemporalModel
@@ -142,7 +143,7 @@ class TestGetStringifiedSchema:
         assert stringified_schema["value"] == pl.String
 
 
-class TestCastToModelSchema:
+class TestCast:
     def test_cast_to_model_schema_with_dataframe(self) -> None:
         """Test casting DataFrame columns to match model schema."""
 
@@ -160,7 +161,7 @@ class TestCastToModelSchema:
             }
         )
 
-        result = TestModel.cast_to_model_schema(df)
+        result = TestModel.cast(df)
         df_collected = result.collect() if isinstance(result, pl.LazyFrame) else result
         # Check that types are cast correctly
         assert df_collected.schema["id"] == pl.Int64
@@ -176,19 +177,21 @@ class TestCastToModelSchema:
 
         class TestModel(PolarsFastDataframeModel):
             user_id: int
-            is_active: bool
+            is_active: Annotated[
+                bool, ColumnInfo(bool_true_string="1", bool_false_string="0")
+            ]
             score: float
 
         # Create LazyFrame with int types for is_active
         lf = pl.LazyFrame(
             {
                 "user_id": ["1", "2", "3"],
-                "is_active": [1, 0, 1],
+                "is_active": ["1", "0", "1"],
                 "score": ["95.5", "87.2", "92.8"],
             }
         )
 
-        result = TestModel.cast_to_model_schema(lf)
+        result = TestModel.cast(lf)
         assert isinstance(result, pl.LazyFrame)
         df_collected = result.collect()
         resuld_schema = df_collected.schema
@@ -217,7 +220,7 @@ class TestCastToModelSchema:
             }
         )
 
-        result = TestModel.cast_to_model_schema(df)
+        result = TestModel.cast(df)
         df_collected = result.collect() if isinstance(result, pl.LazyFrame) else result
         # Check that annotated types are respected
         assert df_collected.schema["small_int"] == pl.Int8
@@ -239,7 +242,7 @@ class TestCastToModelSchema:
         }
 
         df = pl.DataFrame(original_data)
-        result = TestModel.cast_to_model_schema(df)
+        result = TestModel.cast(df)
         df_collected = result.collect() if isinstance(result, pl.LazyFrame) else result
         # Check that data is preserved
         assert df_collected["count"].to_list() == original_data["count"]
@@ -265,7 +268,7 @@ class TestCastToModelSchema:
             }
         )
 
-        result = TestModel.cast_to_model_schema(df)
+        result = TestModel.cast(df)
         df_collected = result.collect() if isinstance(result, pl.LazyFrame) else result
         # Check that types remain correct
         assert df_collected.schema["number"] == pl.Int64
@@ -287,11 +290,11 @@ class TestCastToModelSchema:
 
         # Test with DataFrame
         df = pl.DataFrame({"x": ["1", "2"], "y": ["a", "b"]})
-        result_df = TestModel.cast_to_model_schema(df)
+        result_df = TestModel.cast(df)
         assert isinstance(result_df, pl.DataFrame)
         # Test with LazyFrame
         lf = pl.LazyFrame({"x": ["1", "2"], "y": ["a", "b"]})
-        result_lf = TestModel.cast_to_model_schema(lf)
+        result_lf = TestModel.cast(lf)
         assert isinstance(result_lf, pl.LazyFrame)
 
 
