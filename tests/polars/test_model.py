@@ -1,6 +1,8 @@
 from typing import Annotated
 import polars as pl
+from polars.exceptions import InvalidOperationError
 from pydantic import Field
+import pytest
 from fastdataframe.core.annotation import ColumnInfo
 from fastdataframe.polars.model import PolarsFastDataframeModel
 import datetime as dt
@@ -203,6 +205,68 @@ class TestCast:
         assert df_collected["user_id"].to_list() == [1, 2, 3]
         assert df_collected["is_active"].to_list() == [True, False, True]
         assert df_collected["score"].to_list() == [95.5, 87.2, 92.8]
+
+    @pytest.mark.parametrize(
+        "true_str, false_str, input_values",
+        [("1", "0", ["1", "0", "1"]), ("true", "false", ["true", "false", "true"])],
+    )
+    def test_cast_to_model_string_to_bool(
+        self, true_str: str, false_str: str, input_values: list[str]
+    ) -> None:
+        class TestModel(PolarsFastDataframeModel):
+            is_active: Annotated[
+                bool, ColumnInfo(bool_true_string=true_str, bool_false_string=false_str)
+            ]
+        df = pl.DataFrame({"is_active": input_values})
+        result = TestModel.cast(df)
+        df_collected = result.collect() if isinstance(result, pl.LazyFrame) else result
+        assert df_collected["is_active"].to_list() == [True, False, True]
+
+    @pytest.mark.parametrize(
+        "true_str, false_str, input_values",
+        [("1", "0", ["1", "0", "true"]), ("true", "false", ["true", "false", "0"])],
+    )
+    def test_cast_to_model_string_to_bool_raise_error(
+        self, true_str: str, false_str: str, input_values: list[str]
+    ) -> None:
+        class TestModel(PolarsFastDataframeModel):
+            is_active: Annotated[
+                bool, ColumnInfo(bool_true_string=true_str, bool_false_string=false_str)
+            ]
+        df = pl.DataFrame({"is_active": input_values})
+        with pytest.raises(InvalidOperationError):
+            TestModel.cast(df)
+
+    @pytest.mark.parametrize(
+        "date_format, input_values",
+        [("%Y-%m-%d", ["2021-01-01", "2021-01-02", "2021-01-03"]), ("%Y/%m/%d", ["2021/01/01", "2021/01/02", "2021/01/03"])],
+    )
+    def test_cast_to_model_string_to_date(
+        self, date_format: str, input_values: list[str]
+    ) -> None:
+        class TestModel(PolarsFastDataframeModel):
+            birthday: Annotated[
+                dt.date, ColumnInfo(date_format=date_format)
+            ]
+        df = pl.DataFrame({"birthday": input_values})
+        result = TestModel.cast(df)
+        df_collected = result.collect() if isinstance(result, pl.LazyFrame) else result
+        assert df_collected["birthday"].to_list() == [dt.date(2021, 1, 1), dt.date(2021, 1, 2), dt.date(2021, 1, 3)]
+
+    @pytest.mark.parametrize(
+        "date_format, input_values",
+        [("%Y-%m-%d", ["2021-01-01", "2021/01/02", "2021-01-03"]), ("%Y/%m/%d", ["2021/01/01", "2021-01-02", "2021/01/03"])],
+    )
+    def test_cast_to_model_string_to_date_raise_error(
+        self, date_format: str, input_values: list[str]
+    ) -> None:
+        class TestModel(PolarsFastDataframeModel):
+            birthday: Annotated[
+                dt.date, ColumnInfo(date_format=date_format)
+            ]
+        df = pl.DataFrame({"birthday": input_values})
+        with pytest.raises(InvalidOperationError):
+            TestModel.cast(df)
 
     def test_cast_to_model_schema_with_annotated_types(self) -> None:
         """Test casting with annotated Polars types."""

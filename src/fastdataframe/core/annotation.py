@@ -20,6 +20,7 @@ class ColumnInfo(PydanticMetadata, BaseMetadata):
     is_unique: bool = False
     bool_true_string: str = "true"
     bool_false_string: str = "false"
+    date_format: str = "%Y-%m-%d"
 
     def __get_pydantic_core_schema__(
         self, source_type: Any, handler: Any
