@@ -7,8 +7,13 @@ from pydantic._internal._model_construction import (
     ModelMetaclass as PydanticModelMetaclass,
 )
 
+from fastdataframe.core.pydantic.field_info import (
+    get_serialization_alias,
+    get_validation_alias,
+)
+
 from .annotation import ColumnInfo
-from .types_helper import contains_type
+from .types_helper import contains_type, get_item_of_type
 
 T = TypeVar("T", bound="FastDataframeModel")
 AliasType = Literal["serialization", "validation"]
@@ -53,14 +58,27 @@ class FastDataframeModel(BaseModel, metaclass=FastDataframeModelMetaclass):
     """Base model that enforces FastDataframe annotation on all fields."""
 
     @classmethod
-    def get_fastdataframe_annotations(cls) -> dict[str, ColumnInfo]:
-        """Return a dictionary mapping field_name to FastDataframe annotation objects from the model_json_schema."""
-        schema = cls.model_json_schema()
+    def get_column_infos(
+        cls, alias_type: AliasType = "serialization"
+    ) -> dict[str, ColumnInfo]:
+        """Return a dictionary mapping field_name to ColumnInfo objects from the model_json_schema."""
         fastdataframes = {}
-        for field_name, field_schema in schema.get("properties", {}).items():
-            fastdataframe_doc = field_schema.get("_fastdataframe")
-            if fastdataframe_doc:
-                fastdataframes[field_name] = ColumnInfo.from_schema(
-                    {"json_schema_extra": {"_fastdataframe": fastdataframe_doc}}
+        alias_func = (
+            get_serialization_alias
+            if alias_type == "serialization"
+            else get_validation_alias
+        )
+        for field_name, field_type in cls.__annotations__.items():
+            origin = get_origin(field_type)
+            args = get_args(field_type)
+            alias_name = alias_func(cls.__pydantic_fields__[field_name], field_name)
+            if origin is not Annotated:
+                fastdataframes[alias_name] = ColumnInfo.from_field_type(field_type)
+            elif origin is Annotated:
+                col_info = get_item_of_type(args, ColumnInfo)
+                fastdataframes[alias_name] = (
+                    col_info
+                    if col_info is not None
+                    else ColumnInfo.from_field_type(args[0])
                 )
         return fastdataframes
