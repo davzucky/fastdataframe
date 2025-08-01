@@ -95,7 +95,7 @@ class Transaction(BaseModel):
 from fastdataframe.iceberg.model import IcebergFastDataframeModel
 
 IcebergTransaction = IcebergFastDataframeModel.from_base_model(Transaction)
-iceberg_schema = IcebergTransaction.get_iceberg_schema()
+iceberg_schema = IcebergTransaction.iceberg_schema()
 print(iceberg_schema)
 ```
 
