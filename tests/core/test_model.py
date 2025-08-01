@@ -117,6 +117,7 @@ class TestFastDataframeModel:
 
         # Convert to Iceberg schema
         TestTransaction = FastDataframeModel.from_base_model(Transaction, "test")
+        print(dir(TestTransaction))
         annotations = TestTransaction.get_fastdataframe_annotations()
         assert "transaction_id" in annotations
         assert "amount" in annotations
