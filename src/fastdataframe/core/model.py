@@ -70,6 +70,7 @@ class FastDataframeModel(BaseModel, metaclass=FastDataframeModelMetaclass):
         f"""Convert any FastDataframeModel to a {subclass_name}FastDataframeModel using create_model."""
 
         is_base_model = issubclass(model, BaseModel)
+        annotations_items = {key: val for c in model.__mro__ if '__annotations__' in c.__dict__ for key, val in c.__annotations__.items()}
         field_definitions = {
             field_name: (
                 field_type,
@@ -78,6 +79,7 @@ class FastDataframeModel(BaseModel, metaclass=FastDataframeModelMetaclass):
                 else getattr(model, field_name, ...),
             )
             for field_name, field_type in model.__annotations__.items()
+            for field_name, field_type in annotations_items.items()
         }
 
         new_model: type[T] = create_model(
