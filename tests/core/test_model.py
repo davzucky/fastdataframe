@@ -1,7 +1,7 @@
 """Tests for FastDataframe model implementation."""
 
 from typing import Optional, Union, Annotated, List, Dict, Any
-from pydantic import Field, create_model
+from pydantic import BaseModel, Field, create_model
 import pytest
 
 from fastdataframe import FastDataframeModel
@@ -106,3 +106,18 @@ class TestFastDataframeModel:
         assert "field3" in annotations
         assert "field4" in annotations
         assert annotations["field4"].is_unique is True
+
+    def test_model_conversion(self) -> None:
+        class BaseTransaction(BaseModel):
+            transaction_id: str
+
+        class Transaction(BaseTransaction):
+            amount: float
+            timestamp: str
+
+        # Convert to Iceberg schema
+        TestTransaction = FastDataframeModel.from_base_model(Transaction, "test")
+        annotations = TestTransaction.get_fastdataframe_annotations()
+        assert "transaction_id" in annotations
+        assert "amount" in annotations
+        assert "timestamp" in annotations
