@@ -1,3 +1,4 @@
+from pydantic import BaseModel
 import pytest
 from pyiceberg.types import (
     IntegerType,
@@ -81,6 +82,19 @@ class TestIcebergFastDataframeModel:
         field = schema.fields[0]
         assert isinstance(field.field_type, expected_iceberg_type)
         assert field.required is expected_required
+
+    def test_model_conversion(self) -> None:
+        class BaseTransaction(BaseModel):
+            transaction_id: str
+
+        class Transaction(BaseTransaction):
+            amount: float
+            timestamp: str
+
+        # Convert to Iceberg schema
+        IcebergTransaction = IcebergFastDataframeModel.from_base_model(Transaction)
+        iceberg_schema = IcebergTransaction.iceberg_schema()
+        assert len(iceberg_schema.fields) == 3
 
     class TestIcebergValidation:
         @pytest.fixture
