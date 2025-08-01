@@ -1,8 +1,8 @@
 """FastDataframe model implementation."""
 
-from typing import Any, Literal, TypeVar, Annotated, get_args, get_origin
+from typing import Any, Literal, Type, TypeVar, Annotated, get_args, get_origin
 
-from pydantic import BaseModel
+from pydantic import BaseModel, create_model
 from pydantic._internal._model_construction import (
     ModelMetaclass as PydanticModelMetaclass,
 )
@@ -64,3 +64,26 @@ class FastDataframeModel(BaseModel, metaclass=FastDataframeModelMetaclass):
                     {"json_schema_extra": {"_fastdataframe": fastdataframe_doc}}
                 )
         return fastdataframes
+    
+    @classmethod
+    def from_base_model(cls: Type[T], model: type[Any], subclass_name: str) -> type[T]:
+        f"""Convert any FastDataframeModel to a {subclass_name}FastDataframeModel using create_model."""
+
+        is_base_model = issubclass(model, BaseModel)
+        field_definitions = {
+            field_name: (
+                field_type,
+                model.model_fields[field_name]
+                if is_base_model
+                else getattr(model, field_name, ...),
+            )
+            for field_name, field_type in model.__annotations__.items()
+        }
+
+        new_model: type[T] = create_model(
+            f"{model.__name__}{subclass_name}",
+            __base__=cls,
+            __doc__=f"{subclass_name} version of {model.__name__}",
+            **field_definitions,
+        )  # type: ignore[call-overload]
+        return new_model
