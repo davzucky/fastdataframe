@@ -236,7 +236,7 @@ class PolarsFastDataframeModel(FastDataframeModel):
         """
         source_schema = df.collect_schema()
         target_schema = cls.get_polars_schema(alias_type)
-        column_infos = cls.get_column_infos(alias_type)
+        column_infos = cls.model_columns(alias_type)
         cast_functions = []
 
         for target_col, target_type in target_schema.items():

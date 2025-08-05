@@ -115,7 +115,7 @@ class TestFastDataframeModel:
             field3: Optional[float] = None
             field4: Annotated[bool, ColumnInfo(is_unique=True)]
 
-        annotations = MyModel.get_column_infos()
+        annotations = MyModel.model_columns()
         assert isinstance(annotations, dict)
         assert "field1" in annotations
         assert "field2" in annotations

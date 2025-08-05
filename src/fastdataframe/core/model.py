@@ -109,7 +109,7 @@ class FastDataframeModel(BaseModel):
         return new_model
 
     @classmethod
-    def get_column_infos(
+    def model_columns(
         cls, alias_type: AliasType = "serialization"
     ) -> dict[str, ColumnInfo]:
         """Return a dictionary mapping field_name to ColumnInfo objects from the model_json_schema."""
