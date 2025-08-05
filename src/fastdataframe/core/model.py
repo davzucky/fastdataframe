@@ -23,6 +23,7 @@ def _get_column_info(field_info: FieldInfo) -> ColumnInfo:
             return m
     return ColumnInfo.from_field_type(field_info)
 
+
 class FastDataframeModel(BaseModel):
     """Base model that enforces FastDataframe annotation on all fields."""
 
@@ -112,7 +113,77 @@ class FastDataframeModel(BaseModel):
     def model_columns(
         cls, alias_type: AliasType = "serialization"
     ) -> dict[str, ColumnInfo]:
-        """Return a dictionary mapping field_name to ColumnInfo objects from the model_json_schema."""
+        """Extract column information from the model's fields with alias support.
+        
+        This method returns a dictionary mapping column names (using the specified alias type)
+        to their corresponding ColumnInfo objects. It processes all fields in the model and
+        extracts their metadata, including any FastDataframe-specific annotations like
+        uniqueness constraints, boolean string mappings, and date formats.
+        
+        The method supports two alias types:
+        - "serialization": Uses serialization aliases (default names for storage/export)
+        - "validation": Uses validation aliases (names used during data validation)
+        
+        This is useful for:
+        - Understanding the schema of a model's columns
+        - Extracting metadata for dataframe operations
+        - Validating column configurations
+        - Building schema-aware data processing pipelines
+        
+        Args:
+            alias_type: The type of alias to use for column names.
+                - "serialization": Use serialization aliases (default)
+                - "validation": Use validation aliases
+                
+        Returns:
+            A dictionary mapping column names (using the specified alias) to ColumnInfo objects.
+            Each ColumnInfo contains metadata about the column including type information,
+            uniqueness constraints, and any custom FastDataframe annotations.
+            
+        Example:
+            ```python
+            from fastdataframe import FastDataframeModel, ColumnInfo
+            from typing import Optional, Annotated
+            
+            class UserModel(FastDataframeModel):
+                user_id: Annotated[int, ColumnInfo(is_unique=True)]
+                name: str
+                age: Optional[int] = None
+                is_active: Annotated[bool, ColumnInfo(
+                    bool_true_string="1", 
+                    bool_false_string="0"
+                )]
+                birth_date: Annotated[str, ColumnInfo(date_format="%Y-%m-%d")]
+            
+            # Get column information with serialization aliases
+            columns = UserModel.model_columns(alias_type="serialization")
+            
+            # The result contains column names and their metadata
+            assert "user_id" in columns
+            assert columns["user_id"].is_unique is True
+            assert columns["is_active"].bool_true_string == "1"
+            assert columns["is_active"].bool_false_string == "0"
+            assert columns["birth_date"].date_format == "%Y-%m-%d"
+            
+            # Get column information with validation aliases (if different)
+            validation_columns = UserModel.model_columns(alias_type="validation")
+            
+            # Use the column information for dataframe operations
+            for column_name, column_info in columns.items():
+                print(f"Column: {column_name}")
+                print(f"  Is unique: {column_info.is_unique}")
+                print(f"  Date format: {column_info.date_format}")
+            ```
+            
+        Notes:
+            - Column names are determined by the alias type specified
+            - Fields without explicit ColumnInfo annotations get default ColumnInfo objects
+            - The method processes all model fields, including inherited ones
+            - ColumnInfo objects contain metadata useful for dataframe operations
+            - This method is commonly used by dataframe-specific subclasses (Polars, Iceberg)
+            - The returned dictionary preserves the order of fields in the model
+        """
+        
         columns = {}
         alias_func = (
             get_serialization_alias
