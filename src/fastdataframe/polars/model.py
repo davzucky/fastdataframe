@@ -16,7 +16,6 @@ from fastdataframe.core.json_schema import (
 from fastdataframe.polars._cast_functions import custom_cast_functions, simple_cast
 from fastdataframe.polars._types import get_polars_type
 
-# T = TypeVar("T", bound="PolarsFastDataframeModel")
 TFrame = TypeVar("TFrame", bound=pl.DataFrame | pl.LazyFrame)
 
 
