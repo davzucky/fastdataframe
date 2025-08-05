@@ -1,8 +1,8 @@
 """FastDataframe model implementation."""
 
-from typing import Any, Literal, TypeVar, Annotated, get_args, get_origin
+from typing import Any, Literal, Type, TypeVar, Annotated, get_args, get_origin
 
-from pydantic import BaseModel
+from pydantic import BaseModel, create_model
 from pydantic._internal._model_construction import (
     ModelMetaclass as PydanticModelMetaclass,
 )
@@ -16,6 +16,7 @@ from .annotation import ColumnInfo
 from .types_helper import contains_type, get_item_of_type
 
 T = TypeVar("T", bound="FastDataframeModel")
+TBaseModel = TypeVar("TBaseModel", bound=BaseModel)
 AliasType = Literal["serialization", "validation"]
 
 
@@ -56,6 +57,27 @@ class FastDataframeModelMetaclass(PydanticModelMetaclass):
 
 class FastDataframeModel(BaseModel, metaclass=FastDataframeModelMetaclass):
     """Base model that enforces FastDataframe annotation on all fields."""
+
+
+    @classmethod
+    def from_base_model(cls: Type[T], model: type[TBaseModel]) -> type[T]:
+        """Convert any FastDataframeModel to a PolarsFastDataframeModel using create_model."""
+
+        field_definitions = {
+            field_name: (
+                field_type.annotation,
+                field_type            )
+            for field_name, field_type in model.model_fields.items()
+        }
+
+        new_model: type[T] = create_model(
+            f"{model.__name__}Polars",
+            __base__=cls,
+            __doc__=f"Polars version of {model.__name__}",
+            **field_definitions,
+        )  # type: ignore[call-overload]
+        return new_model
+
 
     @classmethod
     def get_column_infos(

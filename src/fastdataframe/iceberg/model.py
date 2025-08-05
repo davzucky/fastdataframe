@@ -25,7 +25,7 @@ from pyiceberg.schema import Schema
 from fastdataframe.core.types_helper import is_optional_type
 from .json_schema import iceberg_schema_to_json_schema
 
-T = TypeVar("T", bound="IcebergFastDataframeModel")
+# T = TypeVar("T", bound="IcebergFastDataframeModel")
 
 
 # Helper function to map Python/Pydantic types to pyiceberg types
@@ -65,28 +65,28 @@ def _python_type_to_iceberg_type(py_type: Any) -> IcebergType:
 class IcebergFastDataframeModel(FastDataframeModel):
     """A model that extends FastDataframeModel for Iceberg integration."""
 
-    @classmethod
-    def from_base_model(cls: Type[T], model: type[Any]) -> type[T]:
-        """Convert any BaseModel to a IcebergFastDataframeModel using create_model."""
+    # @classmethod
+    # def from_base_model(cls: Type[T], model: type[Any]) -> type[T]:
+    #     """Convert any BaseModel to a IcebergFastDataframeModel using create_model."""
 
-        is_base_model = issubclass(model, BaseModel)
-        field_definitions = {
-            field_name: (
-                field_type,
-                model.model_fields[field_name]
-                if is_base_model
-                else getattr(model, field_name, ...),
-            )
-            for field_name, field_type in model.__annotations__.items()
-        }
+    #     is_base_model = issubclass(model, BaseModel)
+    #     field_definitions = {
+    #         field_name: (
+    #             field_type,
+    #             model.model_fields[field_name]
+    #             if is_base_model
+    #             else getattr(model, field_name, ...),
+    #         )
+    #         for field_name, field_type in model.__annotations__.items()
+    #     }
 
-        new_model: type[T] = create_model(
-            f"{model.__name__}Iceberg",
-            __base__=cls,
-            __doc__=f"Iceberg version of {model.__name__}",
-            **field_definitions,
-        )  # type: ignore[call-overload]
-        return new_model
+    #     new_model: type[T] = create_model(
+    #         f"{model.__name__}Iceberg",
+    #         __base__=cls,
+    #         __doc__=f"Iceberg version of {model.__name__}",
+    #         **field_definitions,
+    #     )  # type: ignore[call-overload]
+    #     return new_model
 
     @classmethod
     def iceberg_schema(cls, alias_type: AliasType = "serialization") -> Schema:

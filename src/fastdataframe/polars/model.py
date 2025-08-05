@@ -16,7 +16,7 @@ from fastdataframe.core.json_schema import (
 from fastdataframe.polars._cast_functions import custom_cast_functions, simple_cast
 from fastdataframe.polars._types import get_polars_type
 
-T = TypeVar("T", bound="PolarsFastDataframeModel")
+# T = TypeVar("T", bound="PolarsFastDataframeModel")
 TFrame = TypeVar("TFrame", bound=pl.DataFrame | pl.LazyFrame)
 
 
@@ -41,28 +41,28 @@ def _extract_polars_frame_json_schema(frame: pl.LazyFrame | pl.DataFrame) -> dic
 class PolarsFastDataframeModel(FastDataframeModel):
     """A model that extends FastDataframeModel for Polars integration."""
 
-    @classmethod
-    def from_base_model(cls: Type[T], model: type[Any]) -> type[T]:
-        """Convert any FastDataframeModel to a PolarsFastDataframeModel using create_model."""
+    # @classmethod
+    # def from_base_model(cls: Type[T], model: type[Any]) -> type[T]:
+    #     """Convert any FastDataframeModel to a PolarsFastDataframeModel using create_model."""
 
-        is_base_model = issubclass(model, BaseModel)
-        field_definitions = {
-            field_name: (
-                field_type,
-                model.model_fields[field_name]
-                if is_base_model
-                else getattr(model, field_name, ...),
-            )
-            for field_name, field_type in model.__annotations__.items()
-        }
+    #     is_base_model = issubclass(model, BaseModel)
+    #     field_definitions = {
+    #         field_name: (
+    #             field_type,
+    #             model.model_fields[field_name]
+    #             if is_base_model
+    #             else getattr(model, field_name, ...),
+    #         )
+    #         for field_name, field_type in model.__annotations__.items()
+    #     }
 
-        new_model: type[T] = create_model(
-            f"{model.__name__}Polars",
-            __base__=cls,
-            __doc__=f"Polars version of {model.__name__}",
-            **field_definitions,
-        )  # type: ignore[call-overload]
-        return new_model
+    #     new_model: type[T] = create_model(
+    #         f"{model.__name__}Polars",
+    #         __base__=cls,
+    #         __doc__=f"Polars version of {model.__name__}",
+    #         **field_definitions,
+    #     )  # type: ignore[call-overload]
+    #     return new_model
 
     @classmethod
     def validate_schema(
