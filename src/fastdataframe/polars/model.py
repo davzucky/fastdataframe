@@ -72,10 +72,8 @@ class PolarsFastDataframeModel(FastDataframeModel):
         )
         return pl.Schema(
             {
-                alias_func(
-                    cls.__pydantic_fields__[field_name], field_name
-                ): get_polars_type(field_type)
-                for field_name, field_type in cls.__annotations__.items()
+                alias_func(field_info, field_name): get_polars_type(field_info)
+                for field_name, field_info in cls.model_fields.items()
             }
         )
 
@@ -91,8 +89,8 @@ class PolarsFastDataframeModel(FastDataframeModel):
         )
         return pl.Schema(
             {
-                alias_func(cls.__pydantic_fields__[field_name], field_name): pl.String
-                for field_name in cls.__annotations__.keys()
+                alias_func(field_info, field_name): pl.String
+                for field_name, field_info in cls.model_fields.items()
             }
         )
 

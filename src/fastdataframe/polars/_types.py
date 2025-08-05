@@ -1,17 +1,19 @@
-from typing import Annotated, Any, get_args, get_origin
+from pydantic.fields import FieldInfo
 import polars as pl
 import inspect
 
 type PolarsType = pl.DataType | pl.DataTypeClass
 
 
-def get_polars_type(field_type: Any) -> PolarsType:
-    if get_origin(field_type) is not Annotated:
-        return pl.DataType.from_python(field_type)
+def get_polars_type(field_info: FieldInfo) -> PolarsType:
+    # Handle case where annotation is None
+    if field_info.annotation is None:
+        polars_type: PolarsType = pl.String()
+    else:
+        polars_type = pl.DataType.from_python(field_info.annotation)
 
-    annotated_args = get_args(field_type)
-    for arg in annotated_args:
+    for arg in field_info.metadata:
         if inspect.isclass(arg) and issubclass(arg, pl.DataType):
-            return arg
+            polars_type = arg
 
-    return pl.DataType.from_python(annotated_args[0])
+    return polars_type
