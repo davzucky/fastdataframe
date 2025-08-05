@@ -217,6 +217,7 @@ class TestCast:
             is_active: Annotated[
                 bool, ColumnInfo(bool_true_string=true_str, bool_false_string=false_str)
             ]
+
         df = pl.DataFrame({"is_active": input_values})
         result = TestModel.cast(df)
         df_collected = result.collect() if isinstance(result, pl.LazyFrame) else result
@@ -233,37 +234,46 @@ class TestCast:
             is_active: Annotated[
                 bool, ColumnInfo(bool_true_string=true_str, bool_false_string=false_str)
             ]
+
         df = pl.DataFrame({"is_active": input_values})
         with pytest.raises(InvalidOperationError):
             TestModel.cast(df)
 
     @pytest.mark.parametrize(
         "date_format, input_values",
-        [("%Y-%m-%d", ["2021-01-01", "2021-01-02", "2021-01-03"]), ("%Y/%m/%d", ["2021/01/01", "2021/01/02", "2021/01/03"])],
+        [
+            ("%Y-%m-%d", ["2021-01-01", "2021-01-02", "2021-01-03"]),
+            ("%Y/%m/%d", ["2021/01/01", "2021/01/02", "2021/01/03"]),
+        ],
     )
     def test_cast_to_model_string_to_date(
         self, date_format: str, input_values: list[str]
     ) -> None:
         class TestModel(PolarsFastDataframeModel):
-            birthday: Annotated[
-                dt.date, ColumnInfo(date_format=date_format)
-            ]
+            birthday: Annotated[dt.date, ColumnInfo(date_format=date_format)]
+
         df = pl.DataFrame({"birthday": input_values})
         result = TestModel.cast(df)
         df_collected = result.collect() if isinstance(result, pl.LazyFrame) else result
-        assert df_collected["birthday"].to_list() == [dt.date(2021, 1, 1), dt.date(2021, 1, 2), dt.date(2021, 1, 3)]
+        assert df_collected["birthday"].to_list() == [
+            dt.date(2021, 1, 1),
+            dt.date(2021, 1, 2),
+            dt.date(2021, 1, 3),
+        ]
 
     @pytest.mark.parametrize(
         "date_format, input_values",
-        [("%Y-%m-%d", ["2021-01-01", "2021/01/02", "2021-01-03"]), ("%Y/%m/%d", ["2021/01/01", "2021-01-02", "2021/01/03"])],
+        [
+            ("%Y-%m-%d", ["2021-01-01", "2021/01/02", "2021-01-03"]),
+            ("%Y/%m/%d", ["2021/01/01", "2021-01-02", "2021/01/03"]),
+        ],
     )
     def test_cast_to_model_string_to_date_raise_error(
         self, date_format: str, input_values: list[str]
     ) -> None:
         class TestModel(PolarsFastDataframeModel):
-            birthday: Annotated[
-                dt.date, ColumnInfo(date_format=date_format)
-            ]
+            birthday: Annotated[dt.date, ColumnInfo(date_format=date_format)]
+
         df = pl.DataFrame({"birthday": input_values})
         with pytest.raises(InvalidOperationError):
             TestModel.cast(df)

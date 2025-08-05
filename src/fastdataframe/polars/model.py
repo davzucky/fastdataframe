@@ -7,8 +7,8 @@ from fastdataframe.core.pydantic.field_info import (
 )
 from fastdataframe.core.validation import ValidationError
 import polars as pl
-from typing import Any, Type, TypeVar, Union
-from pydantic import BaseModel, TypeAdapter, create_model
+from typing import TypeVar, Union
+from pydantic import TypeAdapter
 from fastdataframe.core.json_schema import (
     validate_missing_columns,
     validate_column_types,
@@ -40,29 +40,6 @@ def _extract_polars_frame_json_schema(frame: pl.LazyFrame | pl.DataFrame) -> dic
 
 class PolarsFastDataframeModel(FastDataframeModel):
     """A model that extends FastDataframeModel for Polars integration."""
-
-    # @classmethod
-    # def from_base_model(cls: Type[T], model: type[Any]) -> type[T]:
-    #     """Convert any FastDataframeModel to a PolarsFastDataframeModel using create_model."""
-
-    #     is_base_model = issubclass(model, BaseModel)
-    #     field_definitions = {
-    #         field_name: (
-    #             field_type,
-    #             model.model_fields[field_name]
-    #             if is_base_model
-    #             else getattr(model, field_name, ...),
-    #         )
-    #         for field_name, field_type in model.__annotations__.items()
-    #     }
-
-    #     new_model: type[T] = create_model(
-    #         f"{model.__name__}Polars",
-    #         __base__=cls,
-    #         __doc__=f"Polars version of {model.__name__}",
-    #         **field_definitions,
-    #     )  # type: ignore[call-overload]
-    #     return new_model
 
     @classmethod
     def validate_schema(
@@ -242,7 +219,7 @@ class PolarsFastDataframeModel(FastDataframeModel):
 
             # Cast the dataframe to match the model's schema
             cast_df = UserModel.cast(df)
-            
+
             # The resulting dataframe will have:
             # - id: Int64 (cast from String)
             # - name: String (no change needed)
@@ -271,8 +248,7 @@ class PolarsFastDataframeModel(FastDataframeModel):
             if source_schema[target_col] == target_type:
                 continue
             cast_function = custom_cast_functions.get(
-                (type(source_schema[target_col]), type(target_type)),
-                simple_cast
+                (type(source_schema[target_col]), type(target_type)), simple_cast
             )
 
             cast_functions.append(

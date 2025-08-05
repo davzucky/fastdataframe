@@ -58,18 +58,15 @@ class FastDataframeModelMetaclass(PydanticModelMetaclass):
 class FastDataframeModel(BaseModel, metaclass=FastDataframeModelMetaclass):
     """Base model that enforces FastDataframe annotation on all fields."""
 
-
     @classmethod
     def from_base_model(cls: Type[T], model: type[TBaseModel]) -> type[T]:
         """Convert any FastDataframeModel to a PolarsFastDataframeModel using create_model."""
 
         field_definitions = {
-            field_name: (
-                field_type.annotation,
-                field_type            )
+            field_name: (field_type.annotation, field_type)
             for field_name, field_type in model.model_fields.items()
         }
-        base_model_name = cls.__name__[:-len("FastDataframeModel")]
+        base_model_name = cls.__name__[: -len("FastDataframeModel")]
         new_model: type[T] = create_model(
             f"{model.__name__}{base_model_name}",
             __base__=cls,
@@ -77,7 +74,6 @@ class FastDataframeModel(BaseModel, metaclass=FastDataframeModelMetaclass):
             **field_definitions,
         )  # type: ignore[call-overload]
         return new_model
-
 
     @classmethod
     def get_column_infos(

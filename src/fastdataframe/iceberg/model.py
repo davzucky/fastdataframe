@@ -1,4 +1,3 @@
-from pydantic import BaseModel, create_model
 from fastdataframe.core.json_schema import validate_missing_columns
 from fastdataframe.core.model import AliasType, FastDataframeModel
 from fastdataframe.core.pydantic.field_info import (
@@ -6,7 +5,7 @@ from fastdataframe.core.pydantic.field_info import (
     get_validation_alias,
 )
 from fastdataframe.core.validation import ValidationError
-from typing import Any, List, Type, TypeVar, get_args, get_origin, Annotated
+from typing import Any, List, get_args, get_origin, Annotated
 from pyiceberg.table import Table
 from pyiceberg.types import (
     NestedField,
@@ -64,29 +63,6 @@ def _python_type_to_iceberg_type(py_type: Any) -> IcebergType:
 
 class IcebergFastDataframeModel(FastDataframeModel):
     """A model that extends FastDataframeModel for Iceberg integration."""
-
-    # @classmethod
-    # def from_base_model(cls: Type[T], model: type[Any]) -> type[T]:
-    #     """Convert any BaseModel to a IcebergFastDataframeModel using create_model."""
-
-    #     is_base_model = issubclass(model, BaseModel)
-    #     field_definitions = {
-    #         field_name: (
-    #             field_type,
-    #             model.model_fields[field_name]
-    #             if is_base_model
-    #             else getattr(model, field_name, ...),
-    #         )
-    #         for field_name, field_type in model.__annotations__.items()
-    #     }
-
-    #     new_model: type[T] = create_model(
-    #         f"{model.__name__}Iceberg",
-    #         __base__=cls,
-    #         __doc__=f"Iceberg version of {model.__name__}",
-    #         **field_definitions,
-    #     )  # type: ignore[call-overload]
-    #     return new_model
 
     @classmethod
     def iceberg_schema(cls, alias_type: AliasType = "serialization") -> Schema:
