@@ -1,11 +1,9 @@
 """FastDataframe model implementation."""
 
-from typing import Any, Literal, Type, TypeVar, Annotated, get_args, get_origin
+from typing import Literal, Type, TypeVar
 
 from pydantic import BaseModel, create_model
-from pydantic._internal._model_construction import (
-    ModelMetaclass as PydanticModelMetaclass,
-)
+from pydantic.fields import FieldInfo
 
 from fastdataframe.core.pydantic.field_info import (
     get_serialization_alias,
@@ -13,49 +11,19 @@ from fastdataframe.core.pydantic.field_info import (
 )
 
 from .annotation import ColumnInfo
-from .types_helper import contains_type, get_item_of_type
 
 T = TypeVar("T", bound="FastDataframeModel")
 TBaseModel = TypeVar("TBaseModel", bound=BaseModel)
 AliasType = Literal["serialization", "validation"]
 
 
-class FastDataframeModelMetaclass(PydanticModelMetaclass):
-    """Metaclass that enforces FastDataframe metadata on all fields."""
+def _get_column_info(field_info: FieldInfo) -> ColumnInfo:
+    for m in field_info.metadata:
+        if isinstance(m, ColumnInfo):
+            return m
+    return ColumnInfo.from_field_type(field_info)
 
-    def __new__(
-        mcs,
-        name: str,
-        bases: tuple[type, ...],
-        class_dict: dict[str, Any],
-        **kwargs: Any,
-    ) -> type:
-        """Create a new class with FastDataframe metadata on all fields."""
-
-        new_class_dict = class_dict.copy()
-        if "__annotations__" not in new_class_dict:
-            return super().__new__(mcs, name, bases, new_class_dict, **kwargs)
-
-        # annotations = new_class_dict["__annotations__"]
-        for field_name, field_type in new_class_dict["__annotations__"].items():
-            origin = get_origin(field_type)
-            args = get_args(field_type)
-            if origin is not Annotated:
-                new_class_dict["__annotations__"][field_name] = Annotated[
-                    field_type, ColumnInfo.from_field_type(field_type)
-                ]
-            elif origin is Annotated and contains_type(list(args), ColumnInfo):
-                # Just keep the FastDataframe as is, do not try to set nullability
-                new_class_dict["__annotations__"][field_name] = field_type
-            else:
-                new_class_dict["__annotations__"][field_name] = Annotated[
-                    args + (ColumnInfo.from_field_type(args[0]),)
-                ]
-
-        return super().__new__(mcs, name, bases, new_class_dict, **kwargs)
-
-
-class FastDataframeModel(BaseModel, metaclass=FastDataframeModelMetaclass):
+class FastDataframeModel(BaseModel):
     """Base model that enforces FastDataframe annotation on all fields."""
 
     @classmethod
@@ -98,10 +66,10 @@ class FastDataframeModel(BaseModel, metaclass=FastDataframeModelMetaclass):
             # The new model has all the original fields plus Polars functionality
             assert issubclass(PolarsUser, PolarsFastDataframeModel)
             assert PolarsUser.__name__ == "UserPolars"
-            assert "id" in PolarsUser.__annotations__
-            assert "name" in PolarsUser.__annotations__
-            assert "age" in PolarsUser.__annotations__
-            assert "is_active" in PolarsUser.__annotations__
+            assert "id" in PolarsUser.model_fields
+            assert "name" in PolarsUser.model_fields
+            assert "age" in PolarsUser.model_fields
+            assert "is_active" in PolarsUser.model_fields
 
             # You can now use it with Polars dataframes
             import polars as pl
@@ -145,23 +113,13 @@ class FastDataframeModel(BaseModel, metaclass=FastDataframeModelMetaclass):
         cls, alias_type: AliasType = "serialization"
     ) -> dict[str, ColumnInfo]:
         """Return a dictionary mapping field_name to ColumnInfo objects from the model_json_schema."""
-        fastdataframes = {}
+        columns = {}
         alias_func = (
             get_serialization_alias
             if alias_type == "serialization"
             else get_validation_alias
         )
-        for field_name, field_type in cls.__annotations__.items():
-            origin = get_origin(field_type)
-            args = get_args(field_type)
-            alias_name = alias_func(cls.__pydantic_fields__[field_name], field_name)
-            if origin is not Annotated:
-                fastdataframes[alias_name] = ColumnInfo.from_field_type(field_type)
-            elif origin is Annotated:
-                col_info = get_item_of_type(args, ColumnInfo)
-                fastdataframes[alias_name] = (
-                    col_info
-                    if col_info is not None
-                    else ColumnInfo.from_field_type(args[0])
-                )
-        return fastdataframes
+        for field_name, field_info in cls.model_fields.items():
+            col_info = _get_column_info(field_info)
+            columns[alias_func(field_info, field_name)] = col_info
+        return columns
