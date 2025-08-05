@@ -69,11 +69,11 @@ class FastDataframeModel(BaseModel, metaclass=FastDataframeModelMetaclass):
                 field_type            )
             for field_name, field_type in model.model_fields.items()
         }
-
+        base_model_name = cls.__name__[:-len("FastDataframeModel")]
         new_model: type[T] = create_model(
-            f"{model.__name__}Polars",
+            f"{model.__name__}{base_model_name}",
             __base__=cls,
-            __doc__=f"Polars version of {model.__name__}",
+            __doc__=f"{base_model_name} version of {model.__name__}",
             **field_definitions,
         )  # type: ignore[call-overload]
         return new_model
