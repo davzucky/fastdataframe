@@ -382,7 +382,7 @@ class TestPolarsValidation:
         PolarsModel = PolarsFastDataframeModel.from_base_model(UserTestModel)
         assert issubclass(PolarsModel, PolarsFastDataframeModel)
         assert PolarsModel.__name__ == "UserTestModelPolars"
-        assert PolarsModel.__annotations__ == UserTestModel.__annotations__
+        assert PolarsModel.model_fields.keys() == UserTestModel.model_fields.keys()
         assert PolarsModel.__doc__ == "Polars version of UserTestModel"
         polars_json_schema = PolarsModel.model_json_schema()
         base_json_shema = UserTestModel.model_json_schema()
