@@ -24,8 +24,6 @@ from pyiceberg.schema import Schema
 from fastdataframe.core.types_helper import is_optional_type
 from .json_schema import iceberg_schema_to_json_schema
 
-# T = TypeVar("T", bound="IcebergFastDataframeModel")
-
 
 # Helper function to map Python/Pydantic types to pyiceberg types
 def _python_type_to_iceberg_type(py_type: Any) -> IcebergType:
