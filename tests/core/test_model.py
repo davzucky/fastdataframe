@@ -90,6 +90,22 @@ class TestFastDataframeModel:
         else:
             assert "test_field" in required_fields
 
+    def test_model_conversion(self) -> None:
+        class BaseTransaction(FastDataframeModel):
+            transaction_id: str
+
+        class Transaction(BaseTransaction):
+            amount: float
+            timestamp: str
+
+        # Convert to Iceberg schema
+        TestTransaction = FastDataframeModel.from_base_model(Transaction)
+        print(dir(TestTransaction))
+        annotations = TestTransaction.model_fields.keys()
+        assert "transaction_id" in annotations
+        assert "amount" in annotations
+        assert "timestamp" in annotations
+
     def test_get_fastdataframe_annotations(self) -> None:
         """Test that get_fastdataframe_annotations returns a dictionary mapping field_name to FastDataframe annotation objects."""
 
