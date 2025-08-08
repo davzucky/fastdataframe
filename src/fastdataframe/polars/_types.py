@@ -141,11 +141,30 @@ def get_polars_type(
                     polars_type = pl.Duration("us")
                 else:
                     # Fall back to default Polars type conversion
-                    polars_type = pl.DataType.from_python(field_info.annotation)
+                    raw_type = pl.DataType.from_python(field_info.annotation)
+                    # Handle types that need full specification
+                    if raw_type == pl.Categorical:
+                        polars_type = pl.Categorical()
+                    elif raw_type == pl.Decimal:
+                        # Use a reasonable default precision and scale
+                        polars_type = pl.Decimal(10, 2)
+                    else:
+                        polars_type = raw_type
 
     # Allow explicit Polars type override via metadata
     for arg in field_info.metadata:
         if inspect.isclass(arg) and issubclass(arg, pl.DataType):
+            # Handle types that need full specification
+            if arg == pl.Categorical:
+                polars_type = pl.Categorical()
+            elif arg == pl.Decimal:
+                # Use a reasonable default precision and scale
+                polars_type = pl.Decimal(10, 2)
+            else:
+                polars_type = arg
+            break
+        elif isinstance(arg, pl.DataType):
+            # Already a fully specified instance
             polars_type = arg
             break
 
