@@ -2,6 +2,7 @@ from pydantic.fields import FieldInfo
 from pydantic import BaseModel
 import polars as pl
 import inspect
+import datetime as dt
 from typing import get_origin, get_args, Any, Union
 from fastdataframe.core.pydantic.field_info import (
     get_serialization_alias,
@@ -135,8 +136,12 @@ def get_polars_type(
             if collection_type is not None:
                 polars_type = collection_type
             else:
-                # Fall back to default Polars type conversion
-                polars_type = pl.DataType.from_python(field_info.annotation)
+                # Handle special cases that need fully-specified types
+                if field_info.annotation is dt.timedelta:
+                    polars_type = pl.Duration("us")
+                else:
+                    # Fall back to default Polars type conversion
+                    polars_type = pl.DataType.from_python(field_info.annotation)
 
     # Allow explicit Polars type override via metadata
     for arg in field_info.metadata:

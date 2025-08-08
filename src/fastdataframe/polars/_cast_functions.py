@@ -35,25 +35,30 @@ def str_to_date(
 def str_to_datetime(
     src: pl.DataType, tgt: pl.DataType, col_name: str, column_info: ColumnInfo
 ) -> pl.Expr:
-    if column_info.date_format:
+    # Check if the date_format has time components (suitable for datetime)
+    if column_info.date_format and ('%H' in column_info.date_format or '%T' in column_info.date_format):
         return pl.col(col_name).str.to_datetime(column_info.date_format, strict=True)
     else:
-        return pl.col(col_name).str.to_datetime(strict=True)
+        # For default datetime parsing (e.g., ISO format), use generic cast
+        return pl.col(col_name).cast(tgt, strict=True)
 
 
 def str_to_time(
     src: pl.DataType, tgt: pl.DataType, col_name: str, column_info: ColumnInfo
 ) -> pl.Expr:
-    if column_info.date_format:
+    # Check if the date_format has time components (suitable for time parsing)
+    if column_info.date_format and ('%H' in column_info.date_format or '%M' in column_info.date_format or '%S' in column_info.date_format or '%T' in column_info.date_format):
         return pl.col(col_name).str.to_time(column_info.date_format, strict=True)
     else:
+        # For default time parsing, use str.to_time() without format
         return pl.col(col_name).str.to_time(strict=True)
 
 
 def str_to_duration(
     src: pl.DataType, tgt: pl.DataType, col_name: str, column_info: ColumnInfo
 ) -> pl.Expr:
-    return pl.col(col_name).str.to_duration(strict=True)
+    # Convert string to int64 first, then to duration (assuming microseconds)
+    return pl.col(col_name).cast(pl.Int64, strict=True).cast(tgt, strict=True)
 
 
 def str_to_numeric_with_trim(

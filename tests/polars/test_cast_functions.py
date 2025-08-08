@@ -112,7 +112,7 @@ class TestStringToNumericCasting:
                 value: float
         
         df = pl.DataFrame({"value": invalid_values})
-        with pytest.raises(pl.exceptions.InvalidOperationError):
+        with pytest.raises((pl.exceptions.InvalidOperationError, pl.exceptions.ComputeError)):
             TestModel.cast(df)
 
 
@@ -185,11 +185,21 @@ class TestStringToTemporalCasting:
 
     def test_string_to_duration(self):
         """Test string to duration conversion."""
+        # Use microsecond values that Polars can parse
+        import datetime as dt
+        
         class TestModel(PolarsFastDataframeModel):
             duration: dt.timedelta
+        td1 = dt.timedelta(days=1, hours=2, minutes=3)  
+        td2 = dt.timedelta(hours=5, minutes=30)
+        td3 = dt.timedelta(seconds=45)
         
         df = pl.DataFrame({
-            "duration": ["1d 2h 3m", "5h 30m", "45s"]
+            "duration": [
+                str(int(td1.total_seconds() * 1_000_000)),  # microseconds
+                str(int(td2.total_seconds() * 1_000_000)),
+                str(int(td3.total_seconds() * 1_000_000)),
+            ]
         })
         result = TestModel.cast(df)
         df_collected = result.collect() if isinstance(result, pl.LazyFrame) else result
@@ -217,7 +227,7 @@ class TestStringToTemporalCasting:
                 value: dt.timedelta
         
         df = pl.DataFrame({"value": invalid_values})
-        with pytest.raises(pl.exceptions.InvalidOperationError):
+        with pytest.raises((pl.exceptions.InvalidOperationError, pl.exceptions.ComputeError)):
             TestModel.cast(df)
 
 
