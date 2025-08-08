@@ -1,5 +1,6 @@
+from fastdataframe.core.annotation import ColumnInfo
 from fastdataframe.core.json_schema import validate_missing_columns
-from fastdataframe.core.model import AliasType, FastDataframeModel
+from fastdataframe.core.model import AliasType, FastDataframeModel, _get_column_info
 from fastdataframe.core.pydantic.field_info import (
     get_serialization_alias,
     get_validation_alias,
@@ -19,6 +20,7 @@ from pyiceberg.types import (
     TimestampType,
     UUIDType,
     BinaryType,
+    ListType
 )
 from pyiceberg.schema import Schema
 from fastdataframe.core.types_helper import is_optional_type
@@ -26,23 +28,29 @@ from .json_schema import iceberg_schema_to_json_schema
 
 
 # Helper function to map Python/Pydantic types to pyiceberg types
-def _python_type_to_iceberg_type(py_type: Any) -> IcebergType:
+def _python_type_to_iceberg_type(py_type: Any, field_id: int, column_info: ColumnInfo) -> IcebergType:
+    # Unwrap Annotated to the underlying type
     origin = get_origin(py_type)
     if origin is Annotated:
         py_type = get_args(py_type)[0]
-    # Unwrap Optional/Union[..., NoneType]
+        origin = get_origin(py_type)
+
+    # Unwrap Optional/Union[..., NoneType] for type mapping
     if is_optional_type(py_type):
         args = get_args(py_type)
-        # Remove NoneType from Union
         py_type = next((a for a in args if a is not type(None)), None)
+        origin = get_origin(py_type)
+
+    # Primitive mappings
     if py_type is int:
         return IntegerType()
-    elif py_type is bool:
+    if py_type is bool:
         return BooleanType()
-    elif py_type is float:
+    if py_type is float:
         return DoubleType()
-    elif py_type is str:
+    if py_type is str:
         return StringType()
+
     import datetime
     import uuid
 
@@ -56,7 +64,28 @@ def _python_type_to_iceberg_type(py_type: Any) -> IcebergType:
         return UUIDType()
     if py_type is bytes:
         return BinaryType()
-    return StringType()  # fallback
+
+    # List and sequence-like mappings
+    if origin is list:
+        args = get_args(py_type)
+        if args:
+            element_annotation = args[0]
+            element_required = not is_optional_type(element_annotation)
+            element_type = _python_type_to_iceberg_type(
+                element_annotation, field_id=field_id, column_info=column_info
+            )
+            return ListType(
+                element_id=field_id,
+                element_type=element_type,
+                element_required=element_required,
+            )
+        return ListType()
+
+    if py_type is tuple:
+        return ListType()
+
+    # Fallback to string for unsupported/unknown types
+    return StringType()
 
 
 class IcebergFastDataframeModel(FastDataframeModel):
@@ -72,10 +101,11 @@ class IcebergFastDataframeModel(FastDataframeModel):
         )
 
         fields = []
-        for idx, (field_name, model_field) in enumerate(cls.model_fields.items(), 1):
-            py_type = model_field.annotation
+        for idx, (field_name, field_info) in enumerate(cls.model_fields.items(), 1):
+            py_type = field_info.annotation
+            column_info = _get_column_info(field_info)
             nullable = is_optional_type(py_type)
-            iceberg_type = _python_type_to_iceberg_type(py_type)
+            iceberg_type = _python_type_to_iceberg_type(py_type, field_id=idx, column_info=column_info)
             fields.append(
                 NestedField(
                     field_id=idx,

@@ -9,6 +9,7 @@ from pyiceberg.types import (
     UUIDType,
     TimestampType,
     IcebergType,
+    ListType,
 )
 from pyiceberg.schema import Schema
 from pyiceberg.types import NestedField
@@ -33,7 +34,7 @@ class TestIcebergFastDataframeModel:
             (datetime.datetime, TimestampType),
         ],
     )
-    def test_to_iceberg_schema(
+    def test_to_iceberg_schema_simple_type(
         self, field_type: typing.Any, expected_iceberg_type: typing.Type[IcebergType]
     ) -> None:
         # Dynamically create a model class with a single field
@@ -44,6 +45,49 @@ class TestIcebergFastDataframeModel:
         assert len(schema.fields) == 1
         field = schema.fields[0]
         assert isinstance(field.field_type, expected_iceberg_type)
+        assert field.required is True
+
+    @pytest.mark.parametrize(
+        "field_type,expected_iceberg_type",
+        [
+            (list[str], ListType(element_id=1, element_type=StringType(), element_required=True)),
+        ],
+    )
+    def test_to_iceberg_schema_complex_type(
+        self, field_type: typing.Any, expected_iceberg_type: typing.Type[IcebergType]
+    ) -> None:
+        # Dynamically create a model class with a single field
+        class DynamicModel(IcebergFastDataframeModel):
+            field_name: field_type
+
+        schema = DynamicModel.iceberg_schema()
+        assert len(schema.fields) == 1
+        field = schema.fields[0]
+        assert field.field_type == expected_iceberg_type
+        assert field.required is True
+
+    def test_to_iceberg_schema_optional_list_field(self) -> None:
+        class DynamicModel(IcebergFastDataframeModel):
+            field_name: typing.Optional[list[int]]
+
+        schema = DynamicModel.iceberg_schema()
+        assert len(schema.fields) == 1
+        field = schema.fields[0]
+        assert isinstance(field.field_type, ListType)
+        assert isinstance(field.field_type.element_type, IntegerType)
+        assert field.field_type.element_required is True
+        assert field.required is False
+
+    def test_to_iceberg_schema_list_of_optional_elements(self) -> None:
+        class DynamicModel(IcebergFastDataframeModel):
+            field_name: list[typing.Optional[int]]
+
+        schema = DynamicModel.iceberg_schema()
+        assert len(schema.fields) == 1
+        field = schema.fields[0]
+        assert isinstance(field.field_type, ListType)
+        assert isinstance(field.field_type.element_type, IntegerType)
+        assert field.field_type.element_required is False
         assert field.required is True
 
     @pytest.mark.parametrize(
