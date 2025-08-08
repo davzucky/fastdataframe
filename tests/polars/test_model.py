@@ -745,3 +745,346 @@ class TestCollectionTypes:
 
         errors = TestModel.validate_schema(frame)
         assert len(errors) == 0
+
+
+class TestBaseModelTypes:
+    """Test support for Pydantic BaseModel types in Polars models."""
+
+    def test_simple_basemodel_schema_generation(self) -> None:
+        """Test that BaseModel fields generate correct Polars Struct schemas."""
+        from pydantic import BaseModel
+
+        class Address(BaseModel):
+            street: str
+            city: str
+            zip_code: int
+
+        class TestModel(PolarsFastDataframeModel):
+            name: str
+            address: Address
+
+        schema = TestModel.get_polars_schema()
+
+        # Check that address field is a Struct
+        assert isinstance(schema["address"], pl.Struct)
+
+        # Check struct fields
+        address_struct = schema["address"]
+        expected_fields = {"street": pl.String, "city": pl.String, "zip_code": pl.Int64}
+
+        actual_fields = {field.name: field.dtype for field in address_struct.fields}
+        assert actual_fields == expected_fields
+
+    def test_nested_basemodel_schema_generation(self) -> None:
+        """Test nested BaseModel structures."""
+        from pydantic import BaseModel
+
+        class ContactInfo(BaseModel):
+            email: str
+            phone: str
+
+        class Address(BaseModel):
+            street: str
+            city: str
+            contact: ContactInfo
+
+        class TestModel(PolarsFastDataframeModel):
+            name: str
+            address: Address
+
+        schema = TestModel.get_polars_schema()
+
+        # Check outer struct
+        assert isinstance(schema["address"], pl.Struct)
+        address_struct = schema["address"]
+
+        # Find the contact field within the address struct
+        contact_field = next(f for f in address_struct.fields if f.name == "contact")
+        assert isinstance(contact_field.dtype, pl.Struct)
+
+        # Check nested struct fields
+        contact_struct = contact_field.dtype
+        contact_fields = {field.name: field.dtype for field in contact_struct.fields}
+        assert contact_fields == {"email": pl.String, "phone": pl.String}
+
+    def test_optional_basemodel_schema_generation(self) -> None:
+        """Test optional BaseModel fields."""
+        from pydantic import BaseModel
+        from typing import Optional
+
+        class Address(BaseModel):
+            street: str
+            city: str
+
+        class TestModel(PolarsFastDataframeModel):
+            name: str
+            address: Optional[Address] = None
+
+        schema = TestModel.get_polars_schema()
+
+        # Check that optional address is still a Struct (Polars handles nullability at the data level)
+        assert isinstance(schema["address"], pl.Struct)
+
+        # Check struct fields are correct
+        address_struct = schema["address"]
+        actual_fields = {field.name: field.dtype for field in address_struct.fields}
+        assert actual_fields == {"street": pl.String, "city": pl.String}
+
+    def test_basemodel_validation_success(self) -> None:
+        """Test that valid BaseModel data passes validation."""
+        from pydantic import BaseModel
+
+        class Address(BaseModel):
+            street: str
+            city: str
+            zip_code: int
+
+        class TestModel(PolarsFastDataframeModel):
+            name: str
+            age: int
+            address: Address
+
+        frame = pl.LazyFrame(
+            {
+                "name": ["Alice", "Bob"],
+                "age": [30, 25],
+                "address": [
+                    {"street": "123 Main St", "city": "NYC", "zip_code": 10001},
+                    {"street": "456 Oak Ave", "city": "LA", "zip_code": 90210},
+                ],
+            }
+        )
+
+        errors = TestModel.validate_schema(frame)
+        assert len(errors) == 0
+
+    def test_nested_basemodel_validation_success(self) -> None:
+        """Test that nested BaseModel data passes validation."""
+        from pydantic import BaseModel
+
+        class ContactInfo(BaseModel):
+            email: str
+            phone: str
+
+        class Address(BaseModel):
+            street: str
+            city: str
+            contact: ContactInfo
+
+        class TestModel(PolarsFastDataframeModel):
+            name: str
+            address: Address
+
+        frame = pl.LazyFrame(
+            {
+                "name": ["Alice", "Bob"],
+                "address": [
+                    {
+                        "street": "123 Main St",
+                        "city": "NYC",
+                        "contact": {"email": "alice@example.com", "phone": "555-0001"},
+                    },
+                    {
+                        "street": "456 Oak Ave",
+                        "city": "LA",
+                        "contact": {"email": "bob@example.com", "phone": "555-0002"},
+                    },
+                ],
+            }
+        )
+
+        errors = TestModel.validate_schema(frame)
+        assert len(errors) == 0
+
+    def test_basemodel_with_collections(self) -> None:
+        """Test BaseModel fields combined with collection types."""
+        from pydantic import BaseModel
+
+        class Tag(BaseModel):
+            name: str
+            priority: int
+
+        class TestModel(PolarsFastDataframeModel):
+            title: str
+            tags: list[Tag]  # List of BaseModel objects
+
+        schema = TestModel.get_polars_schema()
+
+        # Check that tags is a List of Struct
+        assert isinstance(schema["tags"], pl.List)
+        assert isinstance(schema["tags"].inner, pl.Struct)
+
+        # Check the struct fields inside the list
+        tag_struct = schema["tags"].inner
+        tag_fields = {field.name: field.dtype for field in tag_struct.fields}
+        assert tag_fields == {"name": pl.String, "priority": pl.Int64}
+
+    def test_basemodel_casting(self) -> None:
+        """Test casting BaseModel data."""
+        from pydantic import BaseModel
+
+        class Address(BaseModel):
+            street: str
+            city: str
+            zip_code: int
+
+        class TestModel(PolarsFastDataframeModel):
+            name: str
+            address: Address
+
+        # Create DataFrame with struct data
+        df = pl.DataFrame(
+            {
+                "name": ["Alice", "Bob"],
+                "address": [
+                    {"street": "123 Main St", "city": "NYC", "zip_code": 10001},
+                    {"street": "456 Oak Ave", "city": "LA", "zip_code": 90210},
+                ],
+            }
+        )
+
+        result = TestModel.cast(df)
+        df_collected = result.collect() if isinstance(result, pl.LazyFrame) else result
+
+        # Check schema is correct
+        assert df_collected.schema["name"] == pl.String
+        assert isinstance(df_collected.schema["address"], pl.Struct)
+
+        # Check data integrity
+        addresses = df_collected["address"].to_list()
+        assert addresses[0]["street"] == "123 Main St"
+        assert addresses[0]["zip_code"] == 10001
+        assert addresses[1]["city"] == "LA"
+
+    @pytest.mark.parametrize(
+        "basemodel_structure",
+        [
+            # Simple BaseModel
+            "simple",
+            # Nested BaseModel (2 levels)
+            "nested_2_levels",
+            # Deeply nested BaseModel (3 levels)
+            "nested_3_levels",
+        ],
+    )
+    def test_basemodel_type_mapping_parametrized(self, basemodel_structure) -> None:
+        """Parametrized test for various BaseModel structures."""
+        from pydantic import BaseModel
+        from fastdataframe.polars._types import get_polars_type
+        from pydantic.fields import FieldInfo
+
+        if basemodel_structure == "simple":
+
+            class TestModel(BaseModel):
+                name: str
+                value: int
+
+            field_info = FieldInfo(annotation=TestModel)
+            result = get_polars_type(field_info)
+
+            assert isinstance(result, pl.Struct)
+            fields = {f.name: f.dtype for f in result.fields}
+            assert fields == {"name": pl.String, "value": pl.Int64}
+
+        elif basemodel_structure == "nested_2_levels":
+
+            class Inner(BaseModel):
+                data: str
+
+            class Outer(BaseModel):
+                name: str
+                inner: Inner
+
+            field_info = FieldInfo(annotation=Outer)
+            result = get_polars_type(field_info)
+
+            assert isinstance(result, pl.Struct)
+            # Check outer fields
+            outer_fields = {f.name: f.dtype for f in result.fields}
+            assert "name" in outer_fields and outer_fields["name"] == pl.String
+            assert "inner" in outer_fields and isinstance(
+                outer_fields["inner"], pl.Struct
+            )
+
+            # Check inner struct
+            inner_struct = outer_fields["inner"]
+            inner_fields = {f.name: f.dtype for f in inner_struct.fields}
+            assert inner_fields == {"data": pl.String}
+
+        elif basemodel_structure == "nested_3_levels":
+
+            class Deep(BaseModel):
+                value: int
+
+            class Middle(BaseModel):
+                name: str
+                deep: Deep
+
+            class Top(BaseModel):
+                title: str
+                middle: Middle
+
+            field_info = FieldInfo(annotation=Top)
+            result = get_polars_type(field_info)
+
+            assert isinstance(result, pl.Struct)
+
+            # Navigate through the nested structure
+            top_fields = {f.name: f.dtype for f in result.fields}
+            assert "title" in top_fields and top_fields["title"] == pl.String
+            assert "middle" in top_fields and isinstance(
+                top_fields["middle"], pl.Struct
+            )
+
+            middle_struct = top_fields["middle"]
+            middle_fields = {f.name: f.dtype for f in middle_struct.fields}
+            assert "name" in middle_fields and middle_fields["name"] == pl.String
+            assert "deep" in middle_fields and isinstance(
+                middle_fields["deep"], pl.Struct
+            )
+
+            deep_struct = middle_fields["deep"]
+            deep_fields = {f.name: f.dtype for f in deep_struct.fields}
+            assert deep_fields == {"value": pl.Int64}
+
+    def test_basemodel_with_field_aliases(self) -> None:
+        """Test BaseModel with Pydantic field aliases."""
+        from pydantic import BaseModel, Field
+        from typing import Annotated
+
+        class Address(BaseModel):
+            street_name: Annotated[str, Field(alias="street")]
+            city_name: Annotated[str, Field(alias="city")]
+
+        class TestModel(PolarsFastDataframeModel):
+            name: str
+            address: Address
+
+        # Test serialization alias schema
+        schema = TestModel.get_polars_schema("serialization")
+        assert isinstance(schema["address"], pl.Struct)
+
+        address_struct = schema["address"]
+        address_fields = {field.name: field.dtype for field in address_struct.fields}
+        # Should use the aliases
+        assert "street" in address_fields
+        assert "city" in address_fields
+        assert address_fields == {"street": pl.String, "city": pl.String}
+
+    def test_empty_basemodel(self) -> None:
+        """Test BaseModel with no fields."""
+        from pydantic import BaseModel
+
+        class EmptyModel(BaseModel):
+            pass
+
+        class TestModel(PolarsFastDataframeModel):
+            name: str
+            empty: EmptyModel
+
+        schema = TestModel.get_polars_schema()
+        assert isinstance(schema["empty"], pl.Struct)
+
+        # Empty struct should have no fields
+        empty_struct = schema["empty"]
+        assert len(empty_struct.fields) == 0

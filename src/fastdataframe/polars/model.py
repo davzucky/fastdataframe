@@ -19,6 +19,44 @@ from fastdataframe.polars._types import get_polars_type
 TFrame = TypeVar("TFrame", bound=pl.DataFrame | pl.LazyFrame)
 
 
+def _resolve_json_schema_refs(schema: dict, defs: dict | None = None) -> dict:
+    """Resolve $ref references in a JSON schema by inlining the referenced schemas.
+
+    Args:
+        schema: The JSON schema that may contain $ref
+        defs: The $defs section containing referenced schemas
+
+    Returns:
+        dict: Schema with $ref references resolved inline
+    """
+    if defs is None:
+        defs = {}
+
+    if isinstance(schema, dict):
+        if "$ref" in schema:
+            # Extract the reference name (e.g., "#/$defs/Address" -> "Address")
+            ref = schema["$ref"]
+            if ref.startswith("#/$defs/"):
+                ref_name = ref[8:]  # Remove "#/$defs/" prefix
+                if ref_name in defs:
+                    # Recursively resolve the referenced schema
+                    return _resolve_json_schema_refs(defs[ref_name], defs)
+            # If we can't resolve the ref, return the original schema
+            return schema
+        else:
+            # Recursively resolve refs in nested objects
+            resolved = {}
+            for key, value in schema.items():
+                resolved[key] = _resolve_json_schema_refs(value, defs)
+            return resolved
+    elif isinstance(schema, list):
+        # Recursively resolve refs in lists
+        return [_resolve_json_schema_refs(item, defs) for item in schema]
+    else:
+        # Return primitive values as-is
+        return schema
+
+
 def _polars_dtype_to_json_schema(polars_dtype: Any) -> dict:
     """Convert a Polars DataType to a JSON schema dict."""
     if isinstance(polars_dtype, pl.List):
@@ -27,6 +65,17 @@ def _polars_dtype_to_json_schema(polars_dtype: Any) -> dict:
     elif isinstance(polars_dtype, pl.Array):
         inner_schema = _polars_dtype_to_json_schema(polars_dtype.inner)
         return {"type": "array", "items": inner_schema}
+    elif isinstance(polars_dtype, pl.Struct):
+        # Handle Struct types by converting each field
+        properties = {}
+        required = []
+
+        for field in polars_dtype.fields:
+            field_schema = _polars_dtype_to_json_schema(field.dtype)
+            properties[field.name] = field_schema
+            required.append(field.name)
+
+        return {"type": "object", "properties": properties, "required": required}
     else:
         # For non-collection types, convert to Python type and use TypeAdapter
         python_type = polars_dtype.to_python()
@@ -69,6 +118,23 @@ class PolarsFastDataframeModel(FastDataframeModel):
         model_json_schema = cls.model_json_schema()
         df_json_schema = _extract_polars_frame_json_schema(frame)
 
+        # Resolve $ref references in the model schema to match DataFrame schema format
+        defs = model_json_schema.get("$defs", {})
+        if defs:
+            # Resolve references in properties
+            resolved_properties = {}
+            for prop_name, prop_schema in model_json_schema.get(
+                "properties", {}
+            ).items():
+                resolved_properties[prop_name] = _resolve_json_schema_refs(
+                    prop_schema, defs
+                )
+
+            # Create a new model schema with resolved references
+            resolved_model_schema = model_json_schema.copy()
+            resolved_model_schema["properties"] = resolved_properties
+            model_json_schema = resolved_model_schema
+
         # Collect all validation errors
         errors = {}
         errors.update(validate_missing_columns(model_json_schema, df_json_schema))
@@ -86,7 +152,9 @@ class PolarsFastDataframeModel(FastDataframeModel):
         )
         return pl.Schema(
             {
-                alias_func(field_info, field_name): get_polars_type(field_info)
+                alias_func(field_info, field_name): get_polars_type(
+                    field_info, alias_type
+                )
                 for field_name, field_info in cls.model_fields.items()
             }
         )
