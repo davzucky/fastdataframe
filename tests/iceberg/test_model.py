@@ -127,6 +127,30 @@ class TestIcebergFastDataframeModel:
 
 
 
+    @pytest.mark.parametrize(
+        "ann",
+        [
+            list[int | str],
+            list[typing.Union[int, str]],
+            set[int | float],
+            tuple[int | bytes],
+        ],
+    )
+    def test_container_with_multi_union_element_raises(self, ann: typing.Any) -> None:
+        class DynamicModel(IcebergFastDataframeModel):
+            field_name: ann
+
+        with pytest.raises(ValueError):
+            DynamicModel.iceberg_schema()
+
+    def test_container_with_optional_element_ok(self) -> None:
+        class DynamicModel(IcebergFastDataframeModel):
+            field_name: list[typing.Optional[int]]
+
+        # Should not raise
+        DynamicModel.iceberg_schema()
+
+
     class TestIcebergValidation:
         @pytest.fixture
         def model(self) -> type[IcebergFastDataframeModel]:

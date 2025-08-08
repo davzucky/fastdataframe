@@ -6,7 +6,7 @@ from fastdataframe.core.pydantic.field_info import (
     get_validation_alias,
 )
 from fastdataframe.core.validation import ValidationError
-from typing import Any, List, get_args, get_origin, Annotated
+from typing import Any, List, get_args, get_origin, Annotated, Union
 from pyiceberg.table import Table
 from pyiceberg.types import (
     NestedField,
@@ -67,9 +67,18 @@ def _python_type_to_iceberg_type(py_type: Any, field_id: int, column_info: Colum
 
     # List and sequence-like mappings
     if origin in (list, set, tuple):
+        import types
         args = get_args(py_type)
         if args:
             element_annotation = args[0]
+            # Disallow unions with more than one non-None type for element types
+            element_origin = get_origin(element_annotation)
+            if element_origin in (Union, getattr(types, "UnionType", None)):
+                union_args = [a for a in get_args(element_annotation) if a is not type(None)]
+                if len(union_args) > 1:
+                    raise ValueError(
+                        "Sequence element types cannot be a union of multiple types; use a single type or Optional[T]."
+                    )
             element_required = not is_optional_type(element_annotation)
             element_type = _python_type_to_iceberg_type(
                 element_annotation, field_id=field_id, column_info=column_info
