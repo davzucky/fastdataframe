@@ -5,7 +5,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Development Commands
 
 ### Package Management (UV)
-- **Install dependencies**: `uv sync` (installs from uv.lock)
+- **Install dependencies**: `uv sync --all-extras` (installs from uv.lock with all extras for testing)
 - **Add dependency**: `uv add <package>` 
 - **Add dev dependency**: `uv add --group dev <package>`
 - **Update dependencies**: `uv update` then `uv lock`
@@ -26,6 +26,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ### Python Version
 - Project requires Python ≥3.12 (specified in pyproject.toml)
 - Use `uv python install 3.12` to install if needed
+
+### GitHub CLI (gh)
+- **View issues**: `gh issue list` or `gh issue view <number>`
+- **Create issue**: `gh issue create --title "Title" --body "Description"`
+- **View pull requests**: `gh pr list` or `gh pr view <number>`
+- **Create pull request**: `gh pr create --title "Title" --body "Description"`
+- **Check PR status**: `gh pr status`
+- **View repository info**: `gh repo view`
 
 ## Architecture Overview
 
@@ -77,6 +85,18 @@ columns = Model.model_columns(alias_type="serialization")  # or "validation"
 ```
 
 ## Development Guidelines
+
+### Issue Tracking and Worktree Workflow
+**IMPORTANT**: Before making any changes to the codebase, ensure there is a corresponding GitHub issue:
+- Check if an issue already exists: `gh issue list`
+- If no issue exists, create one: `gh issue create --title "Description of change" --body "Detailed description"`
+- Reference the issue number in commits and pull requests
+
+**WORKTREE WORKFLOW**: For every new work item, create a dedicated git worktree:
+1. Create worktree: `git worktree add ../<issue-number>-<title-with-spaces-as-hyphens>`
+2. Change to worktree directory: `cd ../<issue-number>-<title-with-spaces-as-hyphens>`
+3. Perform all development work within this worktree
+4. Example: Issue #42 "Add support for datetime validation" → `git worktree add ../42-add-support-for-datetime-validation`
 
 ### Adding New Backend Support
 1. Create new module under `src/fastdataframe/{backend}/`
