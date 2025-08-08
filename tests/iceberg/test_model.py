@@ -11,6 +11,7 @@ from pyiceberg.types import (
     IcebergType,
     ListType,
     MapType,
+    StructType,
 )
 from pyiceberg.schema import Schema
 from pyiceberg.types import NestedField
@@ -19,6 +20,7 @@ from fastdataframe.iceberg.model import IcebergFastDataframeModel
 import datetime
 import uuid
 import typing
+from pydantic import BaseModel
 
 
 class TestIcebergFastDataframeModel:
@@ -61,11 +63,44 @@ class TestIcebergFastDataframeModel:
     @pytest.mark.parametrize(
         "field_type,expected_iceberg_type",
         [
-            (list[str], ListType(element_id=1, element_type=StringType(), element_required=True)),
-            (set[str], ListType(element_id=1, element_type=StringType(), element_required=True)),
-            (tuple[str], ListType(element_id=1, element_type=StringType(), element_required=True)),
-            (dict[str, int], MapType(key_id=1, key_type=StringType(), value_id=1, value_type=IntegerType(), value_required=True)),
-            (dict[str, str], MapType(key_id=1, key_type=StringType(), value_id=1, value_type=StringType(), value_required=True)),
+            (
+                list[str],
+                ListType(
+                    element_id=1, element_type=StringType(), element_required=True
+                ),
+            ),
+            (
+                set[str],
+                ListType(
+                    element_id=1, element_type=StringType(), element_required=True
+                ),
+            ),
+            (
+                tuple[str],
+                ListType(
+                    element_id=1, element_type=StringType(), element_required=True
+                ),
+            ),
+            (
+                dict[str, int],
+                MapType(
+                    key_id=1,
+                    key_type=StringType(),
+                    value_id=1,
+                    value_type=IntegerType(),
+                    value_required=True,
+                ),
+            ),
+            (
+                dict[str, str],
+                MapType(
+                    key_id=1,
+                    key_type=StringType(),
+                    value_id=1,
+                    value_type=StringType(),
+                    value_required=True,
+                ),
+            ),
         ],
     )
     def test_to_iceberg_schema_complex_type(
@@ -90,7 +125,11 @@ class TestIcebergFastDataframeModel:
         ],
     )
     def test_to_iceberg_schema_optional_container_field(
-        self, field_type: typing.Any, element_type: type, element_required: bool, field_required: bool
+        self,
+        field_type: typing.Any,
+        element_type: type,
+        element_required: bool,
+        field_required: bool,
     ) -> None:
         class DynamicModel(IcebergFastDataframeModel):
             field_name: field_type
@@ -111,7 +150,12 @@ class TestIcebergFastDataframeModel:
         ],
     )
     def test_to_iceberg_schema_optional_map_field(
-        self, field_type: typing.Any, key_type: type, value_type: type, value_required: bool, field_required: bool
+        self,
+        field_type: typing.Any,
+        key_type: type,
+        value_type: type,
+        value_required: bool,
+        field_required: bool,
     ) -> None:
         class DynamicModel(IcebergFastDataframeModel):
             field_name: field_type
@@ -125,8 +169,6 @@ class TestIcebergFastDataframeModel:
         assert field.field_type.value_required is value_required
         assert field.required is field_required
 
-
-
     @pytest.mark.parametrize(
         "field_type,element_type,element_required,field_required",
         [
@@ -136,7 +178,11 @@ class TestIcebergFastDataframeModel:
         ],
     )
     def test_to_iceberg_schema_container_of_optional_elements(
-        self, field_type: typing.Any, element_type: type, element_required: bool, field_required: bool
+        self,
+        field_type: typing.Any,
+        element_type: type,
+        element_required: bool,
+        field_required: bool,
     ) -> None:
         class DynamicModel(IcebergFastDataframeModel):
             field_name: field_type
@@ -157,7 +203,12 @@ class TestIcebergFastDataframeModel:
         ],
     )
     def test_to_iceberg_schema_map_with_optional_values(
-        self, field_type: typing.Any, key_type: type, value_type: type, value_required: bool, field_required: bool
+        self,
+        field_type: typing.Any,
+        key_type: type,
+        value_type: type,
+        value_required: bool,
+        field_required: bool,
     ) -> None:
         class DynamicModel(IcebergFastDataframeModel):
             field_name: field_type
@@ -170,9 +221,6 @@ class TestIcebergFastDataframeModel:
         assert isinstance(field.field_type.value_type, value_type)
         assert field.field_type.value_required is value_required
         assert field.required is field_required
-
-
-
 
     @pytest.mark.parametrize(
         "ann",
@@ -207,7 +255,6 @@ class TestIcebergFastDataframeModel:
 
         # Should not raise
         DynamicModel.iceberg_schema()
-
 
     class TestIcebergValidation:
         @pytest.fixture
@@ -255,3 +302,166 @@ class TestIcebergFastDataframeModel:
             assert errors[0].column_name == "field2"
             assert errors[0].error_type == "MissingColumn"
             assert "missing" in errors[0].error_details.lower()
+
+
+class TestBaseModelSupport:
+    """Test cases for Pydantic BaseModel support in Iceberg schema generation."""
+
+    def test_simple_basemodel_field(self) -> None:
+        """Test that a simple BaseModel field maps to StructType."""
+
+        class NestedModel(BaseModel):
+            nested_field: str
+            nested_int: int
+
+        class MainModel(IcebergFastDataframeModel):
+            nested: NestedModel
+
+        schema = MainModel.iceberg_schema()
+        assert len(schema.fields) == 1
+
+        field = schema.fields[0]
+        assert field.name == "nested"
+        assert isinstance(field.field_type, StructType)
+        assert field.required is True
+
+        # Check nested fields
+        struct_fields = field.field_type.fields
+        assert len(struct_fields) == 2
+
+        nested_field = next(f for f in struct_fields if f.name == "nested_field")
+        assert isinstance(nested_field.field_type, StringType)
+        assert nested_field.required is True
+
+        nested_int = next(f for f in struct_fields if f.name == "nested_int")
+        assert isinstance(nested_int.field_type, IntegerType)
+        assert nested_int.required is True
+
+    def test_optional_basemodel_field(self) -> None:
+        """Test that an Optional BaseModel field maps to nullable StructType."""
+
+        class NestedModel(BaseModel):
+            name: str
+
+        class MainModel(IcebergFastDataframeModel):
+            nested: typing.Optional[NestedModel]
+
+        schema = MainModel.iceberg_schema()
+        field = schema.fields[0]
+        assert field.name == "nested"
+        assert isinstance(field.field_type, StructType)
+        assert field.required is False
+
+    def test_nested_basemodel_fields(self) -> None:
+        """Test deeply nested BaseModel structures."""
+
+        class Level3Model(BaseModel):
+            level3_field: str
+
+        class Level2Model(BaseModel):
+            level2_field: int
+            level3: Level3Model
+
+        class Level1Model(BaseModel):
+            level1_field: bool
+            level2: Level2Model
+
+        class MainModel(IcebergFastDataframeModel):
+            root: Level1Model
+
+        schema = MainModel.iceberg_schema()
+        field = schema.fields[0]
+        assert isinstance(field.field_type, StructType)
+
+        # Check level 1 structure
+        level1_fields = field.field_type.fields
+        assert len(level1_fields) == 2
+
+        level1_bool = next(f for f in level1_fields if f.name == "level1_field")
+        assert isinstance(level1_bool.field_type, BooleanType)
+
+        level2_field = next(f for f in level1_fields if f.name == "level2")
+        assert isinstance(level2_field.field_type, StructType)
+
+        # Check level 2 structure
+        level2_fields = level2_field.field_type.fields
+        assert len(level2_fields) == 2
+
+        level2_int = next(f for f in level2_fields if f.name == "level2_field")
+        assert isinstance(level2_int.field_type, IntegerType)
+
+        level3_field = next(f for f in level2_fields if f.name == "level3")
+        assert isinstance(level3_field.field_type, StructType)
+
+        # Check level 3 structure
+        level3_fields = level3_field.field_type.fields
+        assert len(level3_fields) == 1
+        assert level3_fields[0].name == "level3_field"
+        assert isinstance(level3_fields[0].field_type, StringType)
+
+    def test_basemodel_with_optional_fields(self) -> None:
+        """Test BaseModel with optional nested fields."""
+
+        class NestedModel(BaseModel):
+            required_field: str
+            optional_field: typing.Optional[int]
+
+        class MainModel(IcebergFastDataframeModel):
+            nested: NestedModel
+
+        schema = MainModel.iceberg_schema()
+        field = schema.fields[0]
+        struct_fields = field.field_type.fields
+
+        required_field = next(f for f in struct_fields if f.name == "required_field")
+        assert required_field.required is True
+
+        optional_field = next(f for f in struct_fields if f.name == "optional_field")
+        assert optional_field.required is False
+        assert isinstance(optional_field.field_type, IntegerType)
+
+    def test_list_of_basemodels(self) -> None:
+        """Test list containing BaseModel elements."""
+
+        class ItemModel(BaseModel):
+            item_name: str
+            item_value: int
+
+        class MainModel(IcebergFastDataframeModel):
+            items: list[ItemModel]
+
+        schema = MainModel.iceberg_schema()
+        field = schema.fields[0]
+        assert isinstance(field.field_type, ListType)
+        assert isinstance(field.field_type.element_type, StructType)
+
+        # Check the structure of list elements
+        element_fields = field.field_type.element_type.fields
+        assert len(element_fields) == 2
+
+        name_field = next(f for f in element_fields if f.name == "item_name")
+        assert isinstance(name_field.field_type, StringType)
+
+        value_field = next(f for f in element_fields if f.name == "item_value")
+        assert isinstance(value_field.field_type, IntegerType)
+
+    def test_dict_with_basemodel_values(self) -> None:
+        """Test dict with BaseModel as values."""
+
+        class ValueModel(BaseModel):
+            value_field: str
+
+        class MainModel(IcebergFastDataframeModel):
+            mapping: dict[str, ValueModel]
+
+        schema = MainModel.iceberg_schema()
+        field = schema.fields[0]
+        assert isinstance(field.field_type, MapType)
+        assert isinstance(field.field_type.key_type, StringType)
+        assert isinstance(field.field_type.value_type, StructType)
+
+        # Check the structure of map values
+        value_fields = field.field_type.value_type.fields
+        assert len(value_fields) == 1
+        assert value_fields[0].name == "value_field"
+        assert isinstance(value_fields[0].field_type, StringType)

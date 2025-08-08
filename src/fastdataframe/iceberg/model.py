@@ -21,15 +21,46 @@ from pyiceberg.types import (
     UUIDType,
     BinaryType,
     ListType,
-    MapType
+    MapType,
+    StructType,
 )
 from pyiceberg.schema import Schema
 from fastdataframe.core.types_helper import is_optional_type
 from .json_schema import iceberg_schema_to_json_schema
 
 
+# Helper function to convert model fields to Iceberg NestedFields
+def _model_fields_to_iceberg_fields(
+    model_fields: Any, alias_func: Any = None
+) -> List[NestedField]:
+    """Convert Pydantic model fields to Iceberg NestedField list."""
+    fields = []
+    for idx, (field_name, field_info) in enumerate(model_fields.items(), 1):
+        py_type = field_info.annotation
+        column_info = _get_column_info(field_info)
+        nullable = is_optional_type(py_type)
+        iceberg_type = _python_type_to_iceberg_type(
+            py_type, field_id=idx, column_info=column_info
+        )
+        field_display_name = field_name
+        if alias_func:
+            # Use alias function for root level fields (from __pydantic_fields__)
+            field_display_name = alias_func(field_info, field_name)
+        fields.append(
+            NestedField(
+                field_id=idx,
+                name=field_display_name,
+                field_type=iceberg_type,
+                required=not nullable,
+            )
+        )
+    return fields
+
+
 # Helper function to map Python/Pydantic types to pyiceberg types
-def _python_type_to_iceberg_type(py_type: Any, field_id: int, column_info: ColumnInfo) -> IcebergType:
+def _python_type_to_iceberg_type(
+    py_type: Any, field_id: int, column_info: ColumnInfo
+) -> IcebergType:
     # Unwrap Annotated to the underlying type
     origin = get_origin(py_type)
     if origin is Annotated:
@@ -69,13 +100,16 @@ def _python_type_to_iceberg_type(py_type: Any, field_id: int, column_info: Colum
     # List and sequence-like mappings
     if origin in (list, set, tuple):
         import types
+
         args = get_args(py_type)
         if args:
             element_annotation = args[0]
             # Disallow unions with more than one non-None type for element types
             element_origin = get_origin(element_annotation)
             if element_origin in (Union, getattr(types, "UnionType", None)):
-                union_args = [a for a in get_args(element_annotation) if a is not type(None)]
+                union_args = [
+                    a for a in get_args(element_annotation) if a is not type(None)
+                ]
                 if len(union_args) > 1:
                     raise ValueError(
                         "Sequence element types cannot be a union of multiple types; use a single type or Optional[T]."
@@ -94,45 +128,57 @@ def _python_type_to_iceberg_type(py_type: Any, field_id: int, column_info: Colum
     # Dictionary/Map mappings
     if origin is dict:
         import types
+
         args = get_args(py_type)
         if args and len(args) == 2:
             key_annotation, value_annotation = args
-            
+
             # Disallow unions with more than one non-None type for key types
             key_origin = get_origin(key_annotation)
             if key_origin in (Union, getattr(types, "UnionType", None)):
-                union_args = [a for a in get_args(key_annotation) if a is not type(None)]
+                union_args = [
+                    a for a in get_args(key_annotation) if a is not type(None)
+                ]
                 if len(union_args) > 1:
                     raise ValueError(
                         "Map key types cannot be a union of multiple types; use a single type or Optional[T]."
                     )
-            
+
             # Disallow unions with more than one non-None type for value types
             value_origin = get_origin(value_annotation)
             if value_origin in (Union, getattr(types, "UnionType", None)):
-                union_args = [a for a in get_args(value_annotation) if a is not type(None)]
+                union_args = [
+                    a for a in get_args(value_annotation) if a is not type(None)
+                ]
                 if len(union_args) > 1:
                     raise ValueError(
                         "Map value types cannot be a union of multiple types; use a single type or Optional[T]."
                     )
-            
+
             value_required = not is_optional_type(value_annotation)
-            
+
             key_type = _python_type_to_iceberg_type(
                 key_annotation, field_id=field_id, column_info=column_info
             )
             value_type = _python_type_to_iceberg_type(
                 value_annotation, field_id=field_id, column_info=column_info
             )
-            
+
             return MapType(
                 key_id=field_id,
                 key_type=key_type,
                 value_id=field_id,
                 value_type=value_type,
-                value_required=value_required
+                value_required=value_required,
             )
         return MapType()
+
+    # BaseModel support - convert to StructType
+    from pydantic import BaseModel
+
+    if isinstance(py_type, type) and issubclass(py_type, BaseModel):
+        nested_fields = _model_fields_to_iceberg_fields(py_type.model_fields)
+        return StructType(*nested_fields)
 
     # Fallback to string for unsupported/unknown types
     return StringType()
@@ -150,20 +196,11 @@ class IcebergFastDataframeModel(FastDataframeModel):
             else get_validation_alias
         )
 
-        fields = []
-        for idx, (field_name, field_info) in enumerate(cls.model_fields.items(), 1):
-            py_type = field_info.annotation
-            column_info = _get_column_info(field_info)
-            nullable = is_optional_type(py_type)
-            iceberg_type = _python_type_to_iceberg_type(py_type, field_id=idx, column_info=column_info)
-            fields.append(
-                NestedField(
-                    field_id=idx,
-                    name=alias_func(cls.__pydantic_fields__[field_name], field_name),
-                    field_type=iceberg_type,
-                    required=not nullable,
-                )
-            )
+        # Create a custom alias function that works with the __pydantic_fields__ format
+        def pydantic_alias_func(field_info: Any, field_name: str) -> str:
+            return alias_func(cls.__pydantic_fields__[field_name], field_name)
+
+        fields = _model_fields_to_iceberg_fields(cls.model_fields, pydantic_alias_func)
         return Schema(*fields)
 
     @classmethod
