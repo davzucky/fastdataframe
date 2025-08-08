@@ -66,7 +66,7 @@ def _python_type_to_iceberg_type(py_type: Any, field_id: int, column_info: Colum
         return BinaryType()
 
     # List and sequence-like mappings
-    if origin is list:
+    if origin in (list, set, tuple):
         args = get_args(py_type)
         if args:
             element_annotation = args[0]
@@ -79,9 +79,6 @@ def _python_type_to_iceberg_type(py_type: Any, field_id: int, column_info: Colum
                 element_type=element_type,
                 element_required=element_required,
             )
-        return ListType()
-
-    if py_type is tuple:
         return ListType()
 
     # Fallback to string for unsupported/unknown types
