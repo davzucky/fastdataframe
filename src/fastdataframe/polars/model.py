@@ -7,7 +7,7 @@ from fastdataframe.core.pydantic.field_info import (
 )
 from fastdataframe.core.validation import ValidationError
 import polars as pl
-from typing import TypeVar, Union
+from typing import TypeVar, Union, Any
 from pydantic import TypeAdapter
 from fastdataframe.core.json_schema import (
     validate_missing_columns,
@@ -19,15 +19,29 @@ from fastdataframe.polars._types import get_polars_type
 TFrame = TypeVar("TFrame", bound=pl.DataFrame | pl.LazyFrame)
 
 
+def _polars_dtype_to_json_schema(polars_dtype: Any) -> dict:
+    """Convert a Polars DataType to a JSON schema dict."""
+    if isinstance(polars_dtype, pl.List):
+        inner_schema = _polars_dtype_to_json_schema(polars_dtype.inner)
+        return {"type": "array", "items": inner_schema}
+    elif isinstance(polars_dtype, pl.Array):
+        inner_schema = _polars_dtype_to_json_schema(polars_dtype.inner)
+        return {"type": "array", "items": inner_schema}
+    else:
+        # For non-collection types, convert to Python type and use TypeAdapter
+        python_type = polars_dtype.to_python()
+        return TypeAdapter(python_type).json_schema()
+
+
 def _extract_polars_frame_json_schema(frame: pl.LazyFrame | pl.DataFrame) -> dict:
     """
     Given a Polars LazyFrame or DataFrame, return a JSON schema compatible dict for the frame.
     The returned dict will have 'type': 'object', 'properties', and 'required' as per JSON schema standards.
     """
-    python_types = frame.collect_schema().to_python()  # {col: python_type}
+    schema = frame.collect_schema()
     properties = {
-        col: TypeAdapter(python_type).json_schema()
-        for col, python_type in python_types.items()
+        col: _polars_dtype_to_json_schema(polars_dtype)
+        for col, polars_dtype in schema.items()
     }
     required = list(properties.keys())
     return {
