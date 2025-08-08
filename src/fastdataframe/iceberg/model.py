@@ -20,7 +20,8 @@ from pyiceberg.types import (
     TimestampType,
     UUIDType,
     BinaryType,
-    ListType
+    ListType,
+    MapType
 )
 from pyiceberg.schema import Schema
 from fastdataframe.core.types_helper import is_optional_type
@@ -89,6 +90,49 @@ def _python_type_to_iceberg_type(py_type: Any, field_id: int, column_info: Colum
                 element_required=element_required,
             )
         return ListType()
+
+    # Dictionary/Map mappings
+    if origin is dict:
+        import types
+        args = get_args(py_type)
+        if args and len(args) == 2:
+            key_annotation, value_annotation = args
+            
+            # Disallow unions with more than one non-None type for key types
+            key_origin = get_origin(key_annotation)
+            if key_origin in (Union, getattr(types, "UnionType", None)):
+                union_args = [a for a in get_args(key_annotation) if a is not type(None)]
+                if len(union_args) > 1:
+                    raise ValueError(
+                        "Map key types cannot be a union of multiple types; use a single type or Optional[T]."
+                    )
+            
+            # Disallow unions with more than one non-None type for value types
+            value_origin = get_origin(value_annotation)
+            if value_origin in (Union, getattr(types, "UnionType", None)):
+                union_args = [a for a in get_args(value_annotation) if a is not type(None)]
+                if len(union_args) > 1:
+                    raise ValueError(
+                        "Map value types cannot be a union of multiple types; use a single type or Optional[T]."
+                    )
+            
+            value_required = not is_optional_type(value_annotation)
+            
+            key_type = _python_type_to_iceberg_type(
+                key_annotation, field_id=field_id, column_info=column_info
+            )
+            value_type = _python_type_to_iceberg_type(
+                value_annotation, field_id=field_id, column_info=column_info
+            )
+            
+            return MapType(
+                key_id=field_id,
+                key_type=key_type,
+                value_id=field_id,
+                value_type=value_type,
+                value_required=value_required
+            )
+        return MapType()
 
     # Fallback to string for unsupported/unknown types
     return StringType()
