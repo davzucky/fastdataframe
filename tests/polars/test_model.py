@@ -575,3 +575,173 @@ class TestRename:
         assert set(collected.columns) == {"foo", "baz"}
         assert collected["foo"][0] == 1
         assert collected["baz"][0] == "hello"
+
+
+class TestCollectionTypes:
+    """Test support for list, tuple, and set types in Polars models."""
+
+    def test_list_type_schema_generation(self) -> None:
+        """Test that list[T] types generate correct Polars List schemas."""
+
+        class TestModel(PolarsFastDataframeModel):
+            int_list: list[int]
+            str_list: list[str]
+            float_list: list[float]
+
+        schema = TestModel.get_polars_schema()
+        assert schema["int_list"] == pl.List(pl.Int64)
+        assert schema["str_list"] == pl.List(pl.String)
+        assert schema["float_list"] == pl.List(pl.Float64)
+
+    def test_tuple_variable_length_schema_generation(self) -> None:
+        """Test that tuple[T, ...] types generate correct Polars List schemas."""
+
+        class TestModel(PolarsFastDataframeModel):
+            int_tuple: tuple[int, ...]
+            str_tuple: tuple[str, ...]
+            bool_tuple: tuple[bool, ...]
+
+        schema = TestModel.get_polars_schema()
+        assert schema["int_tuple"] == pl.List(pl.Int64)
+        assert schema["str_tuple"] == pl.List(pl.String)
+        assert schema["bool_tuple"] == pl.List(pl.Boolean)
+
+    def test_set_type_schema_generation(self) -> None:
+        """Test that set[T] types generate correct Polars List schemas."""
+
+        class TestModel(PolarsFastDataframeModel):
+            int_set: set[int]
+            str_set: set[str]
+            float_set: set[float]
+
+        schema = TestModel.get_polars_schema()
+        assert schema["int_set"] == pl.List(pl.Int64)
+        assert schema["str_set"] == pl.List(pl.String)
+        assert schema["float_set"] == pl.List(pl.Float64)
+
+    def test_list_validation_success(self) -> None:
+        """Test that valid list data passes validation."""
+
+        class TestModel(PolarsFastDataframeModel):
+            numbers: list[int]
+            words: list[str]
+
+        frame = pl.LazyFrame(
+            {
+                "numbers": [[1, 2, 3], [4, 5], [6]],
+                "words": [["hello", "world"], ["foo"], ["bar", "baz"]],
+            }
+        )
+
+        errors = TestModel.validate_schema(frame)
+        assert len(errors) == 0
+
+    def test_tuple_validation_success(self) -> None:
+        """Test that valid tuple data (represented as lists) passes validation."""
+
+        class TestModel(PolarsFastDataframeModel):
+            coordinates: tuple[float, ...]
+            tags: tuple[str, ...]
+
+        frame = pl.LazyFrame(
+            {
+                "coordinates": [[1.0, 2.0], [3.0, 4.0, 5.0], [6.0]],
+                "tags": [["tag1", "tag2"], ["tag3"], ["tag4", "tag5", "tag6"]],
+            }
+        )
+
+        errors = TestModel.validate_schema(frame)
+        assert len(errors) == 0
+
+    def test_set_validation_success(self) -> None:
+        """Test that valid set data (represented as lists) passes validation."""
+
+        class TestModel(PolarsFastDataframeModel):
+            unique_ids: set[int]
+            categories: set[str]
+
+        frame = pl.LazyFrame(
+            {
+                "unique_ids": [[1, 2, 3], [4, 5], [6, 7, 8, 9]],
+                "categories": [["A", "B"], ["C"], ["D", "E"]],
+            }
+        )
+
+        errors = TestModel.validate_schema(frame)
+        assert len(errors) == 0
+
+    def test_nested_collection_types(self) -> None:
+        """Test nested collection types like list[list[int]]."""
+
+        class TestModel(PolarsFastDataframeModel):
+            matrix: list[list[int]]
+
+        schema = TestModel.get_polars_schema()
+        # list[list[int]] should be pl.List(pl.List(pl.Int64))
+        expected_inner = pl.List(pl.Int64)
+        assert schema["matrix"] == pl.List(expected_inner)
+
+    def test_collection_type_casting(self) -> None:
+        """Test casting string representations to collection types."""
+
+        class TestModel(PolarsFastDataframeModel):
+            numbers: list[int]
+            words: list[str]
+
+        # Create DataFrame with actual list data (not string representations)
+        # since Polars handles list parsing differently than primitive types
+        df = pl.DataFrame(
+            {
+                "numbers": [[1, 2, 3], [4, 5], []],
+                "words": [["hello", "world"], ["foo"], ["bar"]],
+            }
+        )
+
+        result = TestModel.cast(df)
+        df_collected = result.collect() if isinstance(result, pl.LazyFrame) else result
+
+        assert df_collected.schema["numbers"] == pl.List(pl.Int64)
+        assert df_collected.schema["words"] == pl.List(pl.String)
+
+        # Verify data integrity
+        assert df_collected["numbers"].to_list() == [[1, 2, 3], [4, 5], []]
+        assert df_collected["words"].to_list() == [["hello", "world"], ["foo"], ["bar"]]
+
+    @pytest.mark.parametrize(
+        "python_type,expected_polars_type",
+        [
+            (list[int], pl.List(pl.Int64)),
+            (list[str], pl.List(pl.String)),
+            (list[float], pl.List(pl.Float64)),
+            (list[bool], pl.List(pl.Boolean)),
+            (tuple[int, ...], pl.List(pl.Int64)),
+            (tuple[str, ...], pl.List(pl.String)),
+            (set[int], pl.List(pl.Int64)),
+            (set[str], pl.List(pl.String)),
+            (list[list[int]], pl.List(pl.List(pl.Int64))),
+        ],
+    )
+    def test_collection_type_mapping_parametrized(
+        self, python_type, expected_polars_type
+    ) -> None:
+        """Parametrized test for various collection type mappings."""
+        from fastdataframe.polars._types import get_polars_type
+        from pydantic.fields import FieldInfo
+
+        field_info = FieldInfo(annotation=python_type)
+        result = get_polars_type(field_info)
+        assert result == expected_polars_type
+
+    def test_empty_collections_validation(self) -> None:
+        """Test that empty collections are handled correctly."""
+
+        class TestModel(PolarsFastDataframeModel):
+            empty_list: list[int]
+            empty_set: set[str]
+
+        frame = pl.LazyFrame(
+            {"empty_list": [[], [1, 2], []], "empty_set": [[], ["a"], []]}
+        )
+
+        errors = TestModel.validate_schema(frame)
+        assert len(errors) == 0
