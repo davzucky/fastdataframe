@@ -465,3 +465,334 @@ class TestBaseModelSupport:
         assert len(value_fields) == 1
         assert value_fields[0].name == "value_field"
         assert isinstance(value_fields[0].field_type, StringType)
+
+
+class TestIcebergValidationComplex:
+    """Comprehensive tests for validate_schema with complex types (list, map, BaseModel)."""
+
+    class ComplexDummyTable(Table):
+        """A table implementation for testing complex type validation."""
+
+        def __init__(self, schema_dict: dict) -> None:
+            """Create table with schema from nested dict structure."""
+            self._schema = self._dict_to_schema(schema_dict)
+
+        def _dict_to_schema(self, schema_dict: dict) -> Schema:
+            """Convert dict representation to Iceberg Schema."""
+            fields = []
+            for i, (field_name, field_spec) in enumerate(schema_dict.items(), 1):
+                field_type = self._spec_to_iceberg_type(field_spec, i)
+                fields.append(
+                    NestedField(
+                        field_id=i,
+                        name=field_name,
+                        field_type=field_type,
+                        required=field_spec.get("required", True),
+                    )
+                )
+            return Schema(*fields)
+
+        def _spec_to_iceberg_type(self, spec: dict, field_id: int) -> IcebergType:
+            """Convert spec dict to IcebergType."""
+            if spec["type"] == "integer":
+                return IntegerType()
+            elif spec["type"] == "string":
+                return StringType()
+            elif spec["type"] == "boolean":
+                return BooleanType()
+            elif spec["type"] == "list":
+                element_type = self._spec_to_iceberg_type(spec["element"], field_id)
+                return ListType(
+                    element_id=field_id,
+                    element_type=element_type,
+                    element_required=spec["element"].get("required", True),
+                )
+            elif spec["type"] == "map":
+                key_type = self._spec_to_iceberg_type(spec["key"], field_id)
+                value_type = self._spec_to_iceberg_type(spec["value"], field_id)
+                return MapType(
+                    key_id=field_id,
+                    key_type=key_type,
+                    value_id=field_id,
+                    value_type=value_type,
+                    value_required=spec["value"].get("required", True),
+                )
+            elif spec["type"] == "struct":
+                nested_fields = []
+                for j, (nested_name, nested_spec) in enumerate(
+                    spec["fields"].items(), 1
+                ):
+                    nested_type = self._spec_to_iceberg_type(nested_spec, field_id + j)
+                    nested_fields.append(
+                        NestedField(
+                            field_id=field_id + j,
+                            name=nested_name,
+                            field_type=nested_type,
+                            required=nested_spec.get("required", True),
+                        )
+                    )
+                return StructType(*nested_fields)
+            else:
+                return StringType()
+
+        def schema(self) -> Schema:
+            return self._schema
+
+    def test_validate_list_field_present(self) -> None:
+        """Test validation when list field is present."""
+
+        class TestModel(IcebergFastDataframeModel):
+            tags: list[str]
+            numbers: list[int]
+
+        table = self.ComplexDummyTable(
+            {
+                "tags": {"type": "list", "element": {"type": "string"}},
+                "numbers": {"type": "list", "element": {"type": "integer"}},
+            }
+        )
+
+        errors = TestModel.validate_schema(table)
+        assert errors == []
+
+    def test_validate_list_field_missing(self) -> None:
+        """Test validation when list field is missing."""
+
+        class TestModel(IcebergFastDataframeModel):
+            tags: list[str]
+            numbers: list[int]
+
+        table = self.ComplexDummyTable(
+            {
+                "tags": {"type": "list", "element": {"type": "string"}},
+                # missing numbers field
+            }
+        )
+
+        errors = TestModel.validate_schema(table)
+        assert len(errors) == 1
+        assert errors[0].column_name == "numbers"
+        assert errors[0].error_type == "MissingColumn"
+
+    def test_validate_optional_list_field_missing(self) -> None:
+        """Test validation when optional list field is missing (should be allowed)."""
+
+        class TestModel(IcebergFastDataframeModel):
+            tags: list[str]
+            optional_numbers: typing.Optional[list[int]]
+
+        table = self.ComplexDummyTable(
+            {
+                "tags": {"type": "list", "element": {"type": "string"}},
+                # missing optional_numbers is OK
+            }
+        )
+
+        errors = TestModel.validate_schema(table)
+        assert len(errors) == 1  # Still expect missing column error for validation
+        assert errors[0].column_name == "optional_numbers"
+
+    def test_validate_map_field_present(self) -> None:
+        """Test validation when map field is present."""
+
+        class TestModel(IcebergFastDataframeModel):
+            metadata: dict[str, int]
+            config: dict[str, str]
+
+        table = self.ComplexDummyTable(
+            {
+                "metadata": {
+                    "type": "map",
+                    "key": {"type": "string"},
+                    "value": {"type": "integer"},
+                },
+                "config": {
+                    "type": "map",
+                    "key": {"type": "string"},
+                    "value": {"type": "string"},
+                },
+            }
+        )
+
+        errors = TestModel.validate_schema(table)
+        assert errors == []
+
+    def test_validate_map_field_missing(self) -> None:
+        """Test validation when map field is missing."""
+
+        class TestModel(IcebergFastDataframeModel):
+            metadata: dict[str, int]
+            config: dict[str, str]
+
+        table = self.ComplexDummyTable(
+            {
+                "metadata": {
+                    "type": "map",
+                    "key": {"type": "string"},
+                    "value": {"type": "integer"},
+                },
+                # missing config field
+            }
+        )
+
+        errors = TestModel.validate_schema(table)
+        assert len(errors) == 1
+        assert errors[0].column_name == "config"
+        assert errors[0].error_type == "MissingColumn"
+
+    def test_validate_basemodel_field_present(self) -> None:
+        """Test validation when BaseModel field is present."""
+
+        class NestedModel(BaseModel):
+            name: str
+            value: int
+
+        class TestModel(IcebergFastDataframeModel):
+            nested: NestedModel
+
+        table = self.ComplexDummyTable(
+            {
+                "nested": {
+                    "type": "struct",
+                    "fields": {
+                        "name": {"type": "string"},
+                        "value": {"type": "integer"},
+                    },
+                }
+            }
+        )
+
+        errors = TestModel.validate_schema(table)
+        assert errors == []
+
+    def test_validate_basemodel_field_missing(self) -> None:
+        """Test validation when BaseModel field is missing."""
+
+        class NestedModel(BaseModel):
+            name: str
+            value: int
+
+        class TestModel(IcebergFastDataframeModel):
+            nested: NestedModel
+            other_field: str
+
+        table = self.ComplexDummyTable(
+            {
+                "other_field": {"type": "string"},
+                # missing nested field
+            }
+        )
+
+        errors = TestModel.validate_schema(table)
+        assert len(errors) == 1
+        assert errors[0].column_name == "nested"
+        assert errors[0].error_type == "MissingColumn"
+
+    def test_validate_nested_complex_types(self) -> None:
+        """Test validation with deeply nested complex types."""
+
+        class ItemModel(BaseModel):
+            item_name: str
+            item_value: int
+
+        class TestModel(IcebergFastDataframeModel):
+            items: list[ItemModel]
+            mappings: dict[str, ItemModel]
+
+        table = self.ComplexDummyTable(
+            {
+                "items": {
+                    "type": "list",
+                    "element": {
+                        "type": "struct",
+                        "fields": {
+                            "item_name": {"type": "string"},
+                            "item_value": {"type": "integer"},
+                        },
+                    },
+                },
+                "mappings": {
+                    "type": "map",
+                    "key": {"type": "string"},
+                    "value": {
+                        "type": "struct",
+                        "fields": {
+                            "item_name": {"type": "string"},
+                            "item_value": {"type": "integer"},
+                        },
+                    },
+                },
+            }
+        )
+
+        errors = TestModel.validate_schema(table)
+        assert errors == []
+
+    def test_validate_partial_nested_complex_types(self) -> None:
+        """Test validation with some complex fields missing."""
+
+        class ItemModel(BaseModel):
+            item_name: str
+            item_value: int
+
+        class TestModel(IcebergFastDataframeModel):
+            items: list[ItemModel]
+            mappings: dict[str, ItemModel]
+            simple_field: str
+
+        table = self.ComplexDummyTable(
+            {
+                "items": {
+                    "type": "list",
+                    "element": {
+                        "type": "struct",
+                        "fields": {
+                            "item_name": {"type": "string"},
+                            "item_value": {"type": "integer"},
+                        },
+                    },
+                },
+                # missing mappings and simple_field
+            }
+        )
+
+        errors = TestModel.validate_schema(table)
+        assert len(errors) == 2
+        error_columns = {error.column_name for error in errors}
+        assert error_columns == {"mappings", "simple_field"}
+
+    def test_validate_mixed_optional_complex_types(self) -> None:
+        """Test validation with mix of optional and required complex types."""
+
+        class NestedModel(BaseModel):
+            nested_field: str
+
+        class TestModel(IcebergFastDataframeModel):
+            required_list: list[str]
+            optional_list: typing.Optional[list[int]]
+            required_map: dict[str, str]
+            optional_map: typing.Optional[dict[str, int]]
+            required_nested: NestedModel
+            optional_nested: typing.Optional[NestedModel]
+
+        # Table only has required fields
+        table = self.ComplexDummyTable(
+            {
+                "required_list": {"type": "list", "element": {"type": "string"}},
+                "required_map": {
+                    "type": "map",
+                    "key": {"type": "string"},
+                    "value": {"type": "string"},
+                },
+                "required_nested": {
+                    "type": "struct",
+                    "fields": {"nested_field": {"type": "string"}},
+                },
+            }
+        )
+
+        errors = TestModel.validate_schema(table)
+        # Should report missing optional fields too (current validation behavior)
+        assert len(errors) == 3
+        error_columns = {error.column_name for error in errors}
+        assert error_columns == {"optional_list", "optional_map", "optional_nested"}

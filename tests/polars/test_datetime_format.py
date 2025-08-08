@@ -18,8 +18,12 @@ class TestDatetimeFormatConversion:
         # Test common date formats
         assert convert_python_to_chrono_format("%Y-%m-%d") == "%Y-%m-%d"
         assert convert_python_to_chrono_format("%d/%m/%Y") == "%d/%m/%Y"
-        assert convert_python_to_chrono_format("%Y-%m-%d %H:%M:%S") == "%Y-%m-%d %H:%M:%S"
-        assert convert_python_to_chrono_format("%Y-%m-%dT%H:%M:%S") == "%Y-%m-%dT%H:%M:%S"
+        assert (
+            convert_python_to_chrono_format("%Y-%m-%d %H:%M:%S") == "%Y-%m-%d %H:%M:%S"
+        )
+        assert (
+            convert_python_to_chrono_format("%Y-%m-%dT%H:%M:%S") == "%Y-%m-%dT%H:%M:%S"
+        )
 
     def test_time_formats(self):
         """Test time format conversions."""
@@ -29,8 +33,14 @@ class TestDatetimeFormatConversion:
 
     def test_timezone_formats(self):
         """Test timezone format conversions."""
-        assert convert_python_to_chrono_format("%Y-%m-%d %H:%M:%S %z") == "%Y-%m-%d %H:%M:%S %z"
-        assert convert_python_to_chrono_format("%Y-%m-%d %H:%M:%S %Z") == "%Y-%m-%d %H:%M:%S %Z"
+        assert (
+            convert_python_to_chrono_format("%Y-%m-%d %H:%M:%S %z")
+            == "%Y-%m-%d %H:%M:%S %z"
+        )
+        assert (
+            convert_python_to_chrono_format("%Y-%m-%d %H:%M:%S %Z")
+            == "%Y-%m-%d %H:%M:%S %Z"
+        )
 
     def test_weekday_formats(self):
         """Test weekday format conversions."""
@@ -39,7 +49,10 @@ class TestDatetimeFormatConversion:
 
     def test_special_formats(self):
         """Test special format conversions."""
-        assert convert_python_to_chrono_format("%Y-%m-%d %H:%M:%S.%f") == "%Y-%m-%d %H:%M:%S.%f"
+        assert (
+            convert_python_to_chrono_format("%Y-%m-%d %H:%M:%S.%f")
+            == "%Y-%m-%d %H:%M:%S.%f"
+        )
         assert convert_python_to_chrono_format("%s") == "%s"  # Unix timestamp
         assert convert_python_to_chrono_format("%c") == "%c"  # Locale date/time
 
@@ -84,7 +97,7 @@ class TestDatetimeFormatConversion:
         assert is_chrono_format_supported("%f") is True
         assert is_chrono_format_supported("%z") is True
         assert is_chrono_format_supported("%Z") is True
-        
+
         # Test chrono-specific formats
         assert is_chrono_format_supported("%C") is True
         assert is_chrono_format_supported("%q") is True
@@ -94,7 +107,7 @@ class TestDatetimeFormatConversion:
         assert is_chrono_format_supported("%P") is True
         assert is_chrono_format_supported("%:z") is True
         assert is_chrono_format_supported("%+") is True
-        
+
         # Test unsupported formats
         assert is_chrono_format_supported("%Q") is False
         assert is_chrono_format_supported("%L") is False
@@ -102,7 +115,7 @@ class TestDatetimeFormatConversion:
     def test_get_supported_format_codes(self):
         """Test getting supported format codes."""
         supported_codes = get_supported_format_codes()
-        
+
         # Check that common formats are included
         assert "%Y" in supported_codes
         assert "%H" in supported_codes
@@ -110,7 +123,7 @@ class TestDatetimeFormatConversion:
         assert "%d" in supported_codes
         assert "%f" in supported_codes
         assert "%z" in supported_codes
-        
+
         # Check that chrono-specific formats are included
         assert "%C" in supported_codes
         assert "%q" in supported_codes
@@ -128,7 +141,7 @@ class TestDatetimeFormatConversion:
         assert validate_python_format("%H:%M:%S") is True
         assert validate_python_format("%Y-%m-%d %H:%M:%S %z") is True
         assert validate_python_format("%A, %B %d, %Y") is True
-        
+
         # Invalid formats
         assert validate_python_format("%Y-%m-%d %Q") is False
         assert validate_python_format("%L") is False
@@ -138,12 +151,12 @@ class TestDatetimeFormatConversion:
         """Test edge cases and boundary conditions."""
         # Empty string
         assert convert_python_to_chrono_format("") == ""
-        
+
         # String with no format codes
         assert convert_python_to_chrono_format("Hello World") == "Hello World"
-        
+
         # String with literal percent signs
         assert convert_python_to_chrono_format("100%% complete") == "100%% complete"
-        
+
         # Multiple consecutive format codes
         assert convert_python_to_chrono_format("%Y%m%d") == "%Y%m%d"
