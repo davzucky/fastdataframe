@@ -29,6 +29,34 @@ from fastdataframe.core.types_helper import is_optional_type
 from .json_schema import iceberg_schema_to_json_schema
 
 
+# Helper function to convert model fields to Iceberg NestedFields
+def _model_fields_to_iceberg_fields(
+    model_fields: Any, alias_func: Any = None
+) -> List[NestedField]:
+    """Convert Pydantic model fields to Iceberg NestedField list."""
+    fields = []
+    for idx, (field_name, field_info) in enumerate(model_fields.items(), 1):
+        py_type = field_info.annotation
+        column_info = _get_column_info(field_info)
+        nullable = is_optional_type(py_type)
+        iceberg_type = _python_type_to_iceberg_type(
+            py_type, field_id=idx, column_info=column_info
+        )
+        field_display_name = field_name
+        if alias_func:
+            # Use alias function for root level fields (from __pydantic_fields__)
+            field_display_name = alias_func(field_info, field_name)
+        fields.append(
+            NestedField(
+                field_id=idx,
+                name=field_display_name,
+                field_type=iceberg_type,
+                required=not nullable,
+            )
+        )
+    return fields
+
+
 # Helper function to map Python/Pydantic types to pyiceberg types
 def _python_type_to_iceberg_type(
     py_type: Any, field_id: int, column_info: ColumnInfo
@@ -149,24 +177,7 @@ def _python_type_to_iceberg_type(
     from pydantic import BaseModel
 
     if isinstance(py_type, type) and issubclass(py_type, BaseModel):
-        nested_fields = []
-        for nested_field_id, (nested_field_name, nested_field_info) in enumerate(
-            py_type.model_fields.items(), 1
-        ):
-            nested_py_type = nested_field_info.annotation
-            nested_column_info = _get_column_info(nested_field_info)
-            nested_nullable = is_optional_type(nested_py_type)
-            nested_iceberg_type = _python_type_to_iceberg_type(
-                nested_py_type, field_id=nested_field_id, column_info=nested_column_info
-            )
-            nested_fields.append(
-                NestedField(
-                    field_id=nested_field_id,
-                    name=nested_field_name,
-                    field_type=nested_iceberg_type,
-                    required=not nested_nullable,
-                )
-            )
+        nested_fields = _model_fields_to_iceberg_fields(py_type.model_fields)
         return StructType(*nested_fields)
 
     # Fallback to string for unsupported/unknown types
@@ -185,22 +196,11 @@ class IcebergFastDataframeModel(FastDataframeModel):
             else get_validation_alias
         )
 
-        fields = []
-        for idx, (field_name, field_info) in enumerate(cls.model_fields.items(), 1):
-            py_type = field_info.annotation
-            column_info = _get_column_info(field_info)
-            nullable = is_optional_type(py_type)
-            iceberg_type = _python_type_to_iceberg_type(
-                py_type, field_id=idx, column_info=column_info
-            )
-            fields.append(
-                NestedField(
-                    field_id=idx,
-                    name=alias_func(cls.__pydantic_fields__[field_name], field_name),
-                    field_type=iceberg_type,
-                    required=not nullable,
-                )
-            )
+        # Create a custom alias function that works with the __pydantic_fields__ format
+        def pydantic_alias_func(field_info: Any, field_name: str) -> str:
+            return alias_func(cls.__pydantic_fields__[field_name], field_name)
+
+        fields = _model_fields_to_iceberg_fields(cls.model_fields, pydantic_alias_func)
         return Schema(*fields)
 
     @classmethod
