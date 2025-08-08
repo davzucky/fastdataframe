@@ -10,6 +10,7 @@ from pyiceberg.types import (
     TimestampType,
     IcebergType,
     ListType,
+    MapType,
 )
 from pyiceberg.schema import Schema
 from pyiceberg.types import NestedField
@@ -63,6 +64,8 @@ class TestIcebergFastDataframeModel:
             (list[str], ListType(element_id=1, element_type=StringType(), element_required=True)),
             (set[str], ListType(element_id=1, element_type=StringType(), element_required=True)),
             (tuple[str], ListType(element_id=1, element_type=StringType(), element_required=True)),
+            (dict[str, int], MapType(key_id=1, key_type=StringType(), value_id=1, value_type=IntegerType(), value_required=True)),
+            (dict[str, str], MapType(key_id=1, key_type=StringType(), value_id=1, value_type=StringType(), value_required=True)),
         ],
     )
     def test_to_iceberg_schema_complex_type(
@@ -100,6 +103,28 @@ class TestIcebergFastDataframeModel:
         assert field.field_type.element_required is element_required
         assert field.required is field_required
 
+    @pytest.mark.parametrize(
+        "field_type,key_type,value_type,value_required,field_required",
+        [
+            (typing.Optional[dict[str, int]], StringType, IntegerType, True, False),
+            (typing.Optional[dict[int, str]], IntegerType, StringType, True, False),
+        ],
+    )
+    def test_to_iceberg_schema_optional_map_field(
+        self, field_type: typing.Any, key_type: type, value_type: type, value_required: bool, field_required: bool
+    ) -> None:
+        class DynamicModel(IcebergFastDataframeModel):
+            field_name: field_type
+
+        schema = DynamicModel.iceberg_schema()
+        assert len(schema.fields) == 1
+        field = schema.fields[0]
+        assert isinstance(field.field_type, MapType)
+        assert isinstance(field.field_type.key_type, key_type)
+        assert isinstance(field.field_type.value_type, value_type)
+        assert field.field_type.value_required is value_required
+        assert field.required is field_required
+
 
 
     @pytest.mark.parametrize(
@@ -124,6 +149,28 @@ class TestIcebergFastDataframeModel:
         assert field.field_type.element_required is element_required
         assert field.required is field_required
 
+    @pytest.mark.parametrize(
+        "field_type,key_type,value_type,value_required,field_required",
+        [
+            (dict[str, typing.Optional[int]], StringType, IntegerType, False, True),
+            (dict[int, typing.Optional[str]], IntegerType, StringType, False, True),
+        ],
+    )
+    def test_to_iceberg_schema_map_with_optional_values(
+        self, field_type: typing.Any, key_type: type, value_type: type, value_required: bool, field_required: bool
+    ) -> None:
+        class DynamicModel(IcebergFastDataframeModel):
+            field_name: field_type
+
+        schema = DynamicModel.iceberg_schema()
+        assert len(schema.fields) == 1
+        field = schema.fields[0]
+        assert isinstance(field.field_type, MapType)
+        assert isinstance(field.field_type.key_type, key_type)
+        assert isinstance(field.field_type.value_type, value_type)
+        assert field.field_type.value_required is value_required
+        assert field.required is field_required
+
 
 
 
@@ -134,6 +181,10 @@ class TestIcebergFastDataframeModel:
             list[typing.Union[int, str]],
             set[int | float],
             tuple[int | bytes],
+            dict[int | str, int],  # Union key types
+            dict[str, int | str],  # Union value types
+            dict[typing.Union[int, str], int],  # Union key types with explicit Union
+            dict[str, typing.Union[int, str]],  # Union value types with explicit Union
         ],
     )
     def test_container_with_multi_union_element_raises(self, ann: typing.Any) -> None:
@@ -146,6 +197,13 @@ class TestIcebergFastDataframeModel:
     def test_container_with_optional_element_ok(self) -> None:
         class DynamicModel(IcebergFastDataframeModel):
             field_name: list[typing.Optional[int]]
+
+        # Should not raise
+        DynamicModel.iceberg_schema()
+
+    def test_map_with_optional_values_ok(self) -> None:
+        class DynamicModel(IcebergFastDataframeModel):
+            field_name: dict[str, typing.Optional[int]]
 
         # Should not raise
         DynamicModel.iceberg_schema()
