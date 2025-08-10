@@ -170,8 +170,83 @@ class TestDataValidation:
 
         result = UserModel.validate_data(df)
 
-        # Missing columns don't cause validation errors in the validate method
-        # This is different from schema validation - here we only check existing columns
+        # Missing required column should cause all rows to be invalid
+        assert result.has_errors
+        assert len(result.errors) == 1
+        assert result.total_rows == 3
+        assert result.valid_rows == 0
+        assert result.error_row_indices == [0, 1, 2]  # All rows are invalid
+        assert result.success_rate == 0.0
+        assert result.error_rate == 1.0
+
+        # Check error details
+        error = result.errors[0]
+        assert error.column_name == "email"
+        assert error.error_type == "missing_required_column"
+        assert error.error_rows == [0, 1, 2]
+        assert "missing from DataFrame" in error.error_details
+
+        # Clean data should be empty but maintain original schema
+        assert len(result.clean_data) == 0
+        assert result.clean_data.schema == df.schema
+
+    def test_validate_multiple_missing_columns(self):
+        """Test validation when multiple required columns are missing."""
+
+        class UserModel(PolarsFastDataframeModel):
+            id: int
+            name: str
+            email: str
+            age: int
+
+        # DataFrame missing 'email' and 'age' columns
+        df = pl.DataFrame({"id": [1, 2, 3], "name": ["Alice", "Bob", "Charlie"]})
+
+        result = UserModel.validate_data(df)
+
+        # Multiple missing required columns should cause all rows to be invalid
+        assert result.has_errors
+        assert len(result.errors) == 2  # One error for each missing column
+        assert result.total_rows == 3
+        assert result.valid_rows == 0
+        assert result.error_row_indices == [0, 1, 2]  # All rows are invalid
+        assert result.success_rate == 0.0
+        assert result.error_rate == 1.0
+
+        # Check that both missing columns are reported
+        missing_columns = {error.column_name for error in result.errors}
+        assert missing_columns == {"email", "age"}
+        
+        # Each error should report all rows as invalid
+        for error in result.errors:
+            assert error.error_type == "missing_required_column"
+            assert error.error_rows == [0, 1, 2]
+
+        # Clean data should be empty
+        assert len(result.clean_data) == 0
+
+    def test_validate_missing_column_empty_dataframe(self):
+        """Test validation with missing columns on empty DataFrame."""
+
+        class UserModel(PolarsFastDataframeModel):
+            id: int
+            name: str
+            email: str
+
+        # Empty DataFrame missing the 'email' column
+        df = pl.DataFrame({
+            "id": pl.Series([], dtype=pl.Int64),
+            "name": pl.Series([], dtype=pl.String)
+        })
+
+        result = UserModel.validate_data(df)
+
+        # Missing columns on empty DataFrame should not create errors
+        # since there are no rows to be invalid
         assert not result.has_errors
         assert len(result.errors) == 0
-        assert result.clean_data.equals(df)
+        assert result.total_rows == 0
+        assert result.valid_rows == 0
+        assert len(result.error_row_indices) == 0
+        assert result.success_rate == 1.0  # No rows means 100% success
+        assert result.error_rate == 0.0

@@ -418,6 +418,18 @@ class PolarsFastDataframeModel(FastDataframeModel):
                     )
                     errors.append(error)
                     error_row_indices.update(null_row_indices)
+            else:
+                # Missing required column - all rows are invalid
+                all_row_indices = list(range(total_rows))
+                if all_row_indices:  # Only add error if there are rows
+                    error = ValidationError(
+                        column_name=field_name,
+                        error_type="missing_required_column",
+                        error_details=f"Required column '{field_name}' is missing from DataFrame",
+                        error_rows=all_row_indices,
+                    )
+                    errors.append(error)
+                    error_row_indices.update(all_row_indices)
 
         # Create clean data by filtering out error rows
         error_row_indices_list = sorted(list(error_row_indices))
