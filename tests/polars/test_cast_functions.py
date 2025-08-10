@@ -191,6 +191,31 @@ class TestStringToTemporalCasting:
         assert values[0] == dt.datetime(2023, 1, 1, 10, 30, 0)
         assert values[1] == dt.datetime(2023, 12, 31, 23, 59, 0)
 
+    def test_string_to_datetime_python_format_conversion(self):
+        """Test that Python datetime format is converted to Rust chrono format."""
+        from fastdataframe.polars.datetime_format import convert_python_to_chrono_format
+        
+        class TestModel(PolarsFastDataframeModel):
+            # Using Python %T format (which maps to %H:%M:%S in chrono)
+            timestamp: Annotated[dt.datetime, ColumnInfo(date_format="%Y-%m-%d %T")]
+        
+        df = pl.DataFrame({
+            "timestamp": ["2023-01-01 10:30:45", "2023-12-31 23:59:59"]
+        })
+        result = TestModel.cast(df)
+        df_collected = result.collect() if isinstance(result, pl.LazyFrame) else result
+        
+        # Verify the format conversion worked
+        python_format = "%Y-%m-%d %T"
+        chrono_format = convert_python_to_chrono_format(python_format)
+        assert chrono_format == "%Y-%m-%d %H:%M:%S"  # %T expands to %H:%M:%S
+        
+        # Verify the casting worked
+        assert df_collected.schema["timestamp"] == pl.Datetime("us")
+        values = df_collected["timestamp"].to_list()
+        assert values[0] == dt.datetime(2023, 1, 1, 10, 30, 45)
+        assert values[1] == dt.datetime(2023, 12, 31, 23, 59, 59)
+
     def test_string_to_time_default_format(self):
         """Test string to time conversion with default format."""
 
@@ -216,6 +241,31 @@ class TestStringToTemporalCasting:
         result = TestModel.cast(df)
         df_collected = result.collect() if isinstance(result, pl.LazyFrame) else result
 
+        assert df_collected.schema["time_value"] == pl.Time
+        values = df_collected["time_value"].to_list()
+        assert values[0] == dt.time(10, 30, 0)
+        assert values[1] == dt.time(23, 59, 0)
+
+    def test_string_to_time_python_format_conversion(self):
+        """Test that Python time format is converted to Rust chrono format."""
+        from fastdataframe.polars.datetime_format import convert_python_to_chrono_format
+        
+        class TestModel(PolarsFastDataframeModel):
+            # Using Python %R format (which maps to %H:%M in chrono)
+            time_value: Annotated[dt.time, ColumnInfo(date_format="%R")]
+        
+        df = pl.DataFrame({
+            "time_value": ["10:30", "23:59"]
+        })
+        result = TestModel.cast(df)
+        df_collected = result.collect() if isinstance(result, pl.LazyFrame) else result
+        
+        # Verify the format conversion worked
+        python_format = "%R"
+        chrono_format = convert_python_to_chrono_format(python_format)
+        assert chrono_format == "%H:%M"  # %R expands to %H:%M
+        
+        # Verify the casting worked
         assert df_collected.schema["time_value"] == pl.Time
         values = df_collected["time_value"].to_list()
         assert values[0] == dt.time(10, 30, 0)

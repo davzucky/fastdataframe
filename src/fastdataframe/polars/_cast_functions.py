@@ -3,6 +3,7 @@ import polars as pl
 from typing import Callable
 
 from fastdataframe.core.annotation import ColumnInfo
+from fastdataframe.polars.datetime_format import convert_python_to_chrono_format
 
 
 type cast_function_type = Callable[
@@ -29,17 +30,24 @@ def str_to_bool(
 def str_to_date(
     src: pl.DataType, tgt: pl.DataType, col_name: str, column_info: ColumnInfo
 ) -> pl.Expr:
-    return pl.col(col_name).str.to_date(column_info.date_format, strict=True)
+    # Convert Python datetime format to Rust chrono format
+    chrono_format = convert_python_to_chrono_format(column_info.date_format)
+    return pl.col(col_name).str.to_date(chrono_format, strict=True)
 
 
 def str_to_datetime(
     src: pl.DataType, tgt: pl.DataType, col_name: str, column_info: ColumnInfo
 ) -> pl.Expr:
     # Check if the date_format has time components (suitable for datetime)
-    if column_info.date_format and (
-        "%H" in column_info.date_format or "%T" in column_info.date_format
-    ):
-        return pl.col(col_name).str.to_datetime(column_info.date_format, strict=True)
+    if column_info.date_format:
+        # Convert Python datetime format to Rust chrono format first
+        chrono_format = convert_python_to_chrono_format(column_info.date_format)
+        # Check if the converted format has time components
+        if "%H" in chrono_format or "%T" in chrono_format:
+            return pl.col(col_name).str.to_datetime(chrono_format, strict=True)
+        else:
+            # For default datetime parsing (e.g., ISO format), use generic cast
+            return pl.col(col_name).cast(tgt, strict=True)
     else:
         # For default datetime parsing (e.g., ISO format), use generic cast
         return pl.col(col_name).cast(tgt, strict=True)
@@ -49,13 +57,20 @@ def str_to_time(
     src: pl.DataType, tgt: pl.DataType, col_name: str, column_info: ColumnInfo
 ) -> pl.Expr:
     # Check if the date_format has time components (suitable for time parsing)
-    if column_info.date_format and (
-        "%H" in column_info.date_format
-        or "%M" in column_info.date_format
-        or "%S" in column_info.date_format
-        or "%T" in column_info.date_format
-    ):
-        return pl.col(col_name).str.to_time(column_info.date_format, strict=True)
+    if column_info.date_format:
+        # Convert Python datetime format to Rust chrono format first
+        chrono_format = convert_python_to_chrono_format(column_info.date_format)
+        # Check if the converted format has time components
+        if (
+            "%H" in chrono_format
+            or "%M" in chrono_format
+            or "%S" in chrono_format
+            or "%T" in chrono_format
+        ):
+            return pl.col(col_name).str.to_time(chrono_format, strict=True)
+        else:
+            # For default time parsing, use str.to_time() without format
+            return pl.col(col_name).str.to_time(strict=True)
     else:
         # For default time parsing, use str.to_time() without format
         return pl.col(col_name).str.to_time(strict=True)
