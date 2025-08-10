@@ -20,7 +20,12 @@ class TestStringToNumericCasting:
             (int, ["1", "2", "3"], [1, 2, 3], pl.Int64),
             # Signed integers
             (Annotated[int, pl.Int8], ["-128", "127", "0"], [-128, 127, 0], pl.Int8),
-            (Annotated[int, pl.Int16], ["-32768", "32767", "0"], [-32768, 32767, 0], pl.Int16),
+            (
+                Annotated[int, pl.Int16],
+                ["-32768", "32767", "0"],
+                [-32768, 32767, 0],
+                pl.Int16,
+            ),
             (
                 Annotated[int, pl.Int32],
                 ["-2147483648", "2147483647", "0"],
@@ -43,8 +48,18 @@ class TestStringToNumericCasting:
             ),
             # Unsigned integers
             (Annotated[int, pl.UInt8], ["0", "255", "100"], [0, 255, 100], pl.UInt8),
-            (Annotated[int, pl.UInt16], ["0", "65535", "100"], [0, 65535, 100], pl.UInt16),
-            (Annotated[int, pl.UInt32], ["0", "4294967295", "100"], [0, 4294967295, 100], pl.UInt32),
+            (
+                Annotated[int, pl.UInt16],
+                ["0", "65535", "100"],
+                [0, 65535, 100],
+                pl.UInt16,
+            ),
+            (
+                Annotated[int, pl.UInt32],
+                ["0", "4294967295", "100"],
+                [0, 4294967295, 100],
+                pl.UInt32,
+            ),
             (
                 Annotated[int, pl.UInt64],
                 ["0", "18446744073709551615", "100"],
@@ -53,7 +68,12 @@ class TestStringToNumericCasting:
             ),
             # Float types
             (float, ["1.5", "2.7", "3.14"], [1.5, 2.7, 3.14], pl.Float64),
-            (Annotated[float, pl.Float32], ["1.5", "2.7", "3.14"], [1.5, 2.7, 3.14], pl.Float32),
+            (
+                Annotated[float, pl.Float32],
+                ["1.5", "2.7", "3.14"],
+                [1.5, 2.7, 3.14],
+                pl.Float32,
+            ),
         ],
     )
     def test_string_to_numeric_casting(
@@ -138,22 +158,20 @@ class TestStringToTemporalCasting:
     def test_string_to_datetime_python_format_conversion(self):
         """Test that Python datetime format is converted to Rust chrono format."""
         from fastdataframe.polars.datetime_format import convert_python_to_chrono_format
-        
+
         class TestModel(PolarsFastDataframeModel):
             # Using Python %T format (which maps to %H:%M:%S in chrono)
             timestamp: Annotated[dt.datetime, ColumnInfo(date_format="%Y-%m-%d %T")]
-        
-        df = pl.DataFrame({
-            "timestamp": ["2023-01-01 10:30:45", "2023-12-31 23:59:59"]
-        })
+
+        df = pl.DataFrame({"timestamp": ["2023-01-01 10:30:45", "2023-12-31 23:59:59"]})
         result = TestModel.cast(df)
         df_collected = result.collect() if isinstance(result, pl.LazyFrame) else result
-        
+
         # Verify the format conversion worked
         python_format = "%Y-%m-%d %T"
         chrono_format = convert_python_to_chrono_format(python_format)
         assert chrono_format == "%Y-%m-%d %H:%M:%S"  # %T expands to %H:%M:%S
-        
+
         # Verify the casting worked
         assert df_collected.schema["timestamp"] == pl.Datetime("us")
         values = df_collected["timestamp"].to_list()
@@ -193,22 +211,20 @@ class TestStringToTemporalCasting:
     def test_string_to_time_python_format_conversion(self):
         """Test that Python time format is converted to Rust chrono format."""
         from fastdataframe.polars.datetime_format import convert_python_to_chrono_format
-        
+
         class TestModel(PolarsFastDataframeModel):
             # Using Python %R format (which maps to %H:%M in chrono)
             time_value: Annotated[dt.time, ColumnInfo(date_format="%R")]
-        
-        df = pl.DataFrame({
-            "time_value": ["10:30", "23:59"]
-        })
+
+        df = pl.DataFrame({"time_value": ["10:30", "23:59"]})
         result = TestModel.cast(df)
         df_collected = result.collect() if isinstance(result, pl.LazyFrame) else result
-        
+
         # Verify the format conversion worked
         python_format = "%R"
         chrono_format = convert_python_to_chrono_format(python_format)
         assert chrono_format == "%H:%M"  # %R expands to %H:%M
-        
+
         # Verify the casting worked
         assert df_collected.schema["time_value"] == pl.Time
         values = df_collected["time_value"].to_list()

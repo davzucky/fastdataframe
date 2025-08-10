@@ -5,7 +5,7 @@ from fastdataframe.core.pydantic.field_info import (
     get_serialization_alias,
     get_validation_alias,
 )
-from fastdataframe.core.validation import ValidationError
+from fastdataframe.core.validation import ValidationError, ValidationResult
 import polars as pl
 from typing import TypeVar, Union, Any
 from pydantic import TypeAdapter
@@ -342,3 +342,120 @@ class PolarsFastDataframeModel(FastDataframeModel):
         df = df.with_columns(cast_functions)
 
         return df
+
+    @classmethod
+    def validate_data(cls, df: pl.DataFrame) -> ValidationResult:
+        """Validate data content against the model's schema requirements.
+
+        This method performs data validation beyond schema checking, focusing on
+        data quality constraints defined in the model. It validates non-nullable
+        constraints for required fields and returns detailed error information
+        along with a clean dataset.
+
+        Args:
+            df: Polars DataFrame to validate against the model's requirements
+
+        Returns:
+            ValidationResult: Contains validation errors, clean data, and statistics
+
+        Example:
+            ```python
+            class UserModel(PolarsFastDataframeModel):
+                id: int  # Required field
+                name: str  # Required field
+                email: Optional[str] = None  # Optional field
+
+            df = pl.DataFrame({
+                "id": [1, None, 3],  # Row 1 has null in required field
+                "name": ["Alice", "Bob", None],  # Row 2 has null in required field
+                "email": [None, "bob@example.com", "charlie@example.com"]
+            })
+
+            result = UserModel.validate(df)
+            print(f"Found {len(result.errors)} errors")
+            print(f"Clean data has {result.valid_rows} out of {result.total_rows} rows")
+            ```
+
+        Notes:
+            - Validates that required (non-optional) fields don't contain null values
+            - Returns row-level error details for debugging and data quality reporting
+            - Provides clean dataset with problematic rows removed for downstream processing
+            - Future versions will support additional validation rules (uniqueness, ranges, etc.)
+        """
+        total_rows = len(df)
+        errors = []
+        error_row_indices: set[int] = set()
+
+        # Get model fields and identify required (non-optional) fields
+        from pydantic_core import PydanticUndefined
+
+        required_fields = {}
+        for field_name, field_info in cls.model_fields.items():
+            # Check if field is optional by looking at the annotation and default value
+            has_default = field_info.default is not PydanticUndefined
+            has_default_factory = field_info.default_factory is not None
+            is_union_with_none = getattr(
+                field_info.annotation, "__origin__", None
+            ) is Union and type(None) in getattr(field_info.annotation, "__args__", ())
+
+            is_optional = has_default or has_default_factory or is_union_with_none
+            if not is_optional:
+                required_fields[field_name] = field_info
+
+        # Check for null values in required fields
+        for field_name, field_info in required_fields.items():
+            if field_name in df.columns:
+                # Find rows with null values in this required field
+                null_mask = df.select(pl.col(field_name).is_null()).to_series()
+                null_row_indices = [i for i, is_null in enumerate(null_mask) if is_null]
+
+                if null_row_indices:
+                    error = ValidationError(
+                        column_name=field_name,
+                        error_type="null_in_required_field",
+                        error_details=f"Required field '{field_name}' contains null values",
+                        error_rows=null_row_indices,
+                    )
+                    errors.append(error)
+                    error_row_indices.update(null_row_indices)
+            else:
+                # Missing required column - all rows are invalid
+                all_row_indices = list(range(total_rows))
+                if all_row_indices:  # Only add error if there are rows
+                    error = ValidationError(
+                        column_name=field_name,
+                        error_type="missing_required_column",
+                        error_details=f"Required column '{field_name}' is missing from DataFrame",
+                        error_rows=all_row_indices,
+                    )
+                    errors.append(error)
+                    error_row_indices.update(all_row_indices)
+
+        # Create clean data by filtering out error rows
+        error_row_indices_list = sorted(list(error_row_indices))
+        if error_row_indices_list:
+            # Create a mask for valid rows (rows not in error_row_indices)
+            all_indices = list(range(total_rows))
+            valid_indices = [i for i in all_indices if i not in error_row_indices_list]
+            if valid_indices:
+                clean_data = df.slice(
+                    0, 0
+                )  # Start with empty DataFrame with same schema
+                for idx in valid_indices:
+                    clean_data = pl.concat([clean_data, df.slice(idx, 1)])
+            else:
+                # All rows have errors, return empty DataFrame with same schema
+                clean_data = df.slice(0, 0)
+        else:
+            # No errors, return original DataFrame
+            clean_data = df
+
+        valid_rows = len(clean_data)
+
+        return ValidationResult(
+            errors=errors,
+            clean_data=clean_data,
+            error_row_indices=error_row_indices_list,
+            total_rows=total_rows,
+            valid_rows=valid_rows,
+        )
