@@ -14,21 +14,21 @@ class TestStringToNumericCasting:
     """Test string casting to numeric types."""
 
     @pytest.mark.parametrize(
-        "target_type,string_values,expected_values,expected_polars_type",
+        "type_annotation,string_values,expected_values,expected_polars_type",
         [
             # Integer types
             (int, ["1", "2", "3"], [1, 2, 3], pl.Int64),
             # Signed integers
-            ("int8", ["-128", "127", "0"], [-128, 127, 0], pl.Int8),
-            ("int16", ["-32768", "32767", "0"], [-32768, 32767, 0], pl.Int16),
+            (Annotated[int, pl.Int8], ["-128", "127", "0"], [-128, 127, 0], pl.Int8),
+            (Annotated[int, pl.Int16], ["-32768", "32767", "0"], [-32768, 32767, 0], pl.Int16),
             (
-                "int32",
+                Annotated[int, pl.Int32],
                 ["-2147483648", "2147483647", "0"],
                 [-2147483648, 2147483647, 0],
                 pl.Int32,
             ),
             (
-                "int128",
+                Annotated[int, pl.Int128],
                 [
                     "170141183460469231731687303715884105727",
                     "-170141183460469231731687303715884105728",
@@ -42,69 +42,27 @@ class TestStringToNumericCasting:
                 pl.Int128,
             ),
             # Unsigned integers
-            ("uint8", ["0", "255", "100"], [0, 255, 100], pl.UInt8),
-            ("uint16", ["0", "65535", "100"], [0, 65535, 100], pl.UInt16),
-            ("uint32", ["0", "4294967295", "100"], [0, 4294967295, 100], pl.UInt32),
+            (Annotated[int, pl.UInt8], ["0", "255", "100"], [0, 255, 100], pl.UInt8),
+            (Annotated[int, pl.UInt16], ["0", "65535", "100"], [0, 65535, 100], pl.UInt16),
+            (Annotated[int, pl.UInt32], ["0", "4294967295", "100"], [0, 4294967295, 100], pl.UInt32),
             (
-                "uint64",
+                Annotated[int, pl.UInt64],
                 ["0", "18446744073709551615", "100"],
                 [0, 18446744073709551615, 100],
                 pl.UInt64,
             ),
             # Float types
             (float, ["1.5", "2.7", "3.14"], [1.5, 2.7, 3.14], pl.Float64),
-            ("float32", ["1.5", "2.7", "3.14"], [1.5, 2.7, 3.14], pl.Float32),
+            (Annotated[float, pl.Float32], ["1.5", "2.7", "3.14"], [1.5, 2.7, 3.14], pl.Float32),
         ],
     )
     def test_string_to_numeric_casting(
-        self, target_type, string_values, expected_values, expected_polars_type
+        self, type_annotation, string_values, expected_values, expected_polars_type
     ):
         """Test casting strings to various numeric types."""
 
-        if target_type is int:
-
-            class TestModel(PolarsFastDataframeModel):
-                value: int
-        elif target_type is float:
-
-            class TestModel(PolarsFastDataframeModel):
-                value: float
-        elif target_type == "int8":
-
-            class TestModel(PolarsFastDataframeModel):
-                value: Annotated[int, pl.Int8]
-        elif target_type == "int16":
-
-            class TestModel(PolarsFastDataframeModel):
-                value: Annotated[int, pl.Int16]
-        elif target_type == "int32":
-
-            class TestModel(PolarsFastDataframeModel):
-                value: Annotated[int, pl.Int32]
-        elif target_type == "int128":
-
-            class TestModel(PolarsFastDataframeModel):
-                value: Annotated[int, pl.Int128]
-        elif target_type == "uint8":
-
-            class TestModel(PolarsFastDataframeModel):
-                value: Annotated[int, pl.UInt8]
-        elif target_type == "uint16":
-
-            class TestModel(PolarsFastDataframeModel):
-                value: Annotated[int, pl.UInt16]
-        elif target_type == "uint32":
-
-            class TestModel(PolarsFastDataframeModel):
-                value: Annotated[int, pl.UInt32]
-        elif target_type == "uint64":
-
-            class TestModel(PolarsFastDataframeModel):
-                value: Annotated[int, pl.UInt64]
-        elif target_type == "float32":
-
-            class TestModel(PolarsFastDataframeModel):
-                value: Annotated[float, pl.Float32]
+        class TestModel(PolarsFastDataframeModel):
+            value: type_annotation
 
         df = pl.DataFrame({"value": string_values})
         result = TestModel.cast(df)
@@ -123,33 +81,19 @@ class TestStringToNumericCasting:
             assert actual_values == expected_values
 
     @pytest.mark.parametrize(
-        "target_type,invalid_values",
+        "type_annotation,invalid_values",
         [
             (int, ["abc", "1.5", ""]),
-            ("int8", ["128", "-129", "abc"]),
-            ("uint8", ["-1", "256", "abc"]),
+            (Annotated[int, pl.Int8], ["128", "-129", "abc"]),
+            (Annotated[int, pl.UInt8], ["-1", "256", "abc"]),
             (float, ["abc", ""]),
         ],
     )
-    def test_string_to_numeric_casting_errors(self, target_type, invalid_values):
+    def test_string_to_numeric_casting_errors(self, type_annotation, invalid_values):
         """Test that invalid string values raise errors during casting."""
 
-        if target_type is int:
-
-            class TestModel(PolarsFastDataframeModel):
-                value: int
-        elif target_type == "int8":
-
-            class TestModel(PolarsFastDataframeModel):
-                value: Annotated[int, pl.Int8]
-        elif target_type == "uint8":
-
-            class TestModel(PolarsFastDataframeModel):
-                value: Annotated[int, pl.UInt8]
-        elif target_type is float:
-
-            class TestModel(PolarsFastDataframeModel):
-                value: float
+        class TestModel(PolarsFastDataframeModel):
+            value: type_annotation
 
         df = pl.DataFrame({"value": invalid_values})
         with pytest.raises(
