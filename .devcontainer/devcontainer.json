@@ -1,0 +1,58 @@
+{
+  "name": "FastDataFrame Python 3.13",
+  "image": "mcr.microsoft.com/devcontainers/python:3.13",
+
+  "features": {
+    "ghcr.io/devcontainers/features/github-cli:1": {},
+    "ghcr.io/devcontainers/features/common-utils:2": {
+      "installZsh": true,
+      "configureZshAsDefaultShell": true,
+      "installOhMyZsh": true
+    },
+    "ghcr.io/devcontainers/features/node:1": {}
+  },
+
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-python.python",
+        "ms-python.vscode-pylance",
+        "ms-python.mypy-type-checker",
+        "charliermarsh.ruff",
+        "tamasfe.even-better-toml",
+        "GitHub.vscode-pull-request-github",
+        "eamodio.gitlens"
+      ],
+      "settings": {
+        "python.defaultInterpreterPath": "/usr/local/bin/python",
+        "python.testing.pytestEnabled": true,
+        "python.testing.unittestEnabled": false,
+        "python.testing.pytestArgs": [
+          "tests"
+        ],
+        "[python]": {
+          "editor.defaultFormatter": "charliermarsh.ruff",
+          "editor.formatOnSave": true,
+          "editor.codeActionsOnSave": {
+            "source.fixAll": "explicit",
+            "source.organizeImports": "explicit"
+          }
+        },
+        "mypy-type-checker.args": [
+          "--strict"
+        ],
+        "ruff.lint.args": [
+          "--config=pyproject.toml"
+        ]
+      }
+    }
+  },
+
+  "postCreateCommand": "pip install uv && uv sync --all-extras && npm install -g @anthropic-ai/claude-code @fission-ai/openspec && curl https://cursor.com/install -fsS | bash",
+
+  "remoteUser": "vscode",
+
+  "mounts": [
+    "source=${localEnv:HOME}${localEnv:USERPROFILE}/.gitconfig,target=/home/vscode/.gitconfig,type=bind,consistency=cached"
+  ]
+}
