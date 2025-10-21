@@ -1,0 +1,18 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git push:*)",
+      "Bash(uv run pytest:*)",
+      "Bash(python3:*)",
+      "Bash(uv run:*)",
+      "Bash(git add:*)",
+      "Bash(gh issue create:*)",
+      "Bash(git checkout:*)",
+      "Bash(git commit:*)",
+      "Bash(mkdir:*)",
+      "Read(//home/david/**)",
+      "Bash(git config:*)"
+    ],
+    "deny": []
+  }
+}
