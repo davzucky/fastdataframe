@@ -16,8 +16,7 @@
     "vscode": {
       "extensions": [
         "ms-python.python",
-        "ms-python.vscode-pylance",
-        "ms-python.mypy-type-checker",
+        "astral-sh.ty",
         "charliermarsh.ruff",
         "tamasfe.even-better-toml",
         "GitHub.vscode-pull-request-github",
@@ -38,17 +37,15 @@
             "source.organizeImports": "explicit"
           }
         },
-        "mypy-type-checker.args": [
-          "--strict"
-        ],
         "ruff.lint.args": [
           "--config=pyproject.toml"
-        ]
+        ],
+        "ty.configurationPreference": "filesystemFirst"
       }
     }
   },
 
-  "postCreateCommand": "pip install uv && uv sync --all-extras && npm install -g @anthropic-ai/claude-code @fission-ai/openspec && curl https://cursor.com/install -fsS | bash",
+  "postCreateCommand": "pip install uv && uv sync --all-extras && npm install -g @anthropic-ai/claude-code @fission-ai/openspec && curl https://cursor.com/install -fsS | bash && uv tool install prek && prek install",
 
   "remoteUser": "vscode",
 
