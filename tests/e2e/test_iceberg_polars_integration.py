@@ -94,7 +94,9 @@ class TestIcebergPolarsIntegration:
         table.append(arrow_table)
 
         # 7. Read Iceberg table back to Polars
-        df_read = pl.from_arrow(table.scan().to_arrow())
+        df_read_result = pl.from_arrow(table.scan().to_arrow())
+        assert isinstance(df_read_result, pl.DataFrame)
+        df_read = df_read_result
 
         # 8. Assert data integrity
         # Check shape matches
@@ -148,7 +150,9 @@ class TestIcebergPolarsIntegration:
 
         table.append(empty_arrow)
 
-        df_read = pl.from_arrow(table.scan().to_arrow())
+        df_read_result = pl.from_arrow(table.scan().to_arrow())
+        assert isinstance(df_read_result, pl.DataFrame)
+        df_read = df_read_result
 
         assert df_read.shape[0] == 0
         expected_columns = {
@@ -189,7 +193,9 @@ class TestIcebergPolarsIntegration:
         arrow_table = df.to_arrow().cast(pa_schema)
         table.append(arrow_table)
 
-        df_read = pl.from_arrow(table.scan().to_arrow())
+        df_read_result = pl.from_arrow(table.scan().to_arrow())
+        assert isinstance(df_read_result, pl.DataFrame)
+        df_read = df_read_result
 
         # All optional columns should be null
         assert df_read["description"].null_count() == 2

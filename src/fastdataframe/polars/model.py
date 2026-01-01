@@ -19,7 +19,7 @@ from fastdataframe.polars._types import get_polars_type
 TFrame = TypeVar("TFrame", bound=pl.DataFrame | pl.LazyFrame)
 
 
-def _resolve_json_schema_refs(schema: dict, defs: dict | None = None) -> dict:
+def _resolve_json_schema_refs(schema: Any, defs: dict | None = None) -> Any:
     """Resolve $ref references in a JSON schema by inlining the referenced schemas.
 
     Args:

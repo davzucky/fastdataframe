@@ -83,7 +83,7 @@ class TestDatetimeFormatConversion:
     def test_invalid_input(self):
         """Test handling of invalid input."""
         with pytest.raises(ValueError, match="Format string must be a string"):
-            convert_python_to_chrono_format(123)
+            convert_python_to_chrono_format(123)  # type: ignore[arg-type]
 
         with pytest.raises(ValueError, match="Unsupported format codes: %"):
             convert_python_to_chrono_format("%")
