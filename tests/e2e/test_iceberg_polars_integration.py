@@ -108,9 +108,7 @@ class TestIcebergPolarsIntegration:
         assert df_read_sorted["id"].to_list() == df_sorted["id"].to_list()
         assert df_read_sorted["name"].to_list() == df_sorted["name"].to_list()
         assert df_read_sorted["price"].to_list() == df_sorted["price"].to_list()
-        assert (
-            df_read_sorted["is_active"].to_list() == df_sorted["is_active"].to_list()
-        )
+        assert df_read_sorted["is_active"].to_list() == df_sorted["is_active"].to_list()
 
         # Verify null handling for optional columns
         assert (
@@ -153,7 +151,14 @@ class TestIcebergPolarsIntegration:
         df_read = pl.from_arrow(table.scan().to_arrow())
 
         assert df_read.shape[0] == 0
-        expected_columns = {"id", "name", "price", "description", "quantity", "is_active"}
+        expected_columns = {
+            "id",
+            "name",
+            "price",
+            "description",
+            "quantity",
+            "is_active",
+        }
         assert set(df_read.columns) == expected_columns
 
     def test_all_optional_columns_null(self, iceberg_catalog: Catalog) -> None:

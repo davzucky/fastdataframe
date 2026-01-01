@@ -216,7 +216,7 @@ class TestDataValidation:
         # Check that both missing columns are reported
         missing_columns = {error.column_name for error in result.errors}
         assert missing_columns == {"email", "age"}
-        
+
         # Each error should report all rows as invalid
         for error in result.errors:
             assert error.error_type == "missing_required_column"
@@ -234,10 +234,12 @@ class TestDataValidation:
             email: str
 
         # Empty DataFrame missing the 'email' column
-        df = pl.DataFrame({
-            "id": pl.Series([], dtype=pl.Int64),
-            "name": pl.Series([], dtype=pl.String)
-        })
+        df = pl.DataFrame(
+            {
+                "id": pl.Series([], dtype=pl.Int64),
+                "name": pl.Series([], dtype=pl.String),
+            }
+        )
 
         result = UserModel.validate_data(df)
 
