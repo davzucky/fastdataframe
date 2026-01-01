@@ -29,7 +29,7 @@ polars = [
     "polars>=1.26.0",
 ]
 iceberg = [
-    "pyiceberg>=0.9",
+    "pyiceberg[pyarrow,sql-sqlite]>=0.9",
 ]
 
 
