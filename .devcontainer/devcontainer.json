@@ -45,7 +45,7 @@
     }
   },
 
-  "postCreateCommand": "pip install uv && uv sync --all-extras && npm install -g @anthropic-ai/claude-code @fission-ai/openspec && curl https://cursor.com/install -fsS | bash && uv tool install prek && prek install",
+  "postCreateCommand": "bash .devcontainer/post-create.sh",
 
   "remoteUser": "vscode",
 
