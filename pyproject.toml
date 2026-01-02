@@ -10,7 +10,7 @@ readme = "README.md"
 requires-python = ">=3.12"
 license = "MIT"
 dependencies = [
-    "pydantic>=2.0,<3.0",
+    "pydantic>=2.12",
     "annotated-types>=0.5.0",
 ]
 classifiers = [
