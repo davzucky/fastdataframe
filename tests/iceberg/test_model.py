@@ -411,6 +411,7 @@ class TestBaseModelSupport:
 
         schema = MainModel.iceberg_schema()
         field = schema.fields[0]
+        assert isinstance(field.field_type, StructType)
         struct_fields = field.field_type.fields
 
         required_field = next(f for f in struct_fields if f.name == "required_field")

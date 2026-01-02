@@ -24,7 +24,7 @@ from pyiceberg.types import (
 
 
 class JsonSchemaVisitor(SchemaVisitorPerPrimitiveType[dict[str, Any]]):
-    def visit_boolean(self, field: BooleanType) -> dict[str, Any]:
+    def visit_boolean(self, boolean_type: BooleanType) -> dict[str, Any]:
         return {"type": "boolean"}
 
     def visit_integer(self, integer_type: IntegerType) -> dict[str, Any]:
