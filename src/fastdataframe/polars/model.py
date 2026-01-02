@@ -18,16 +18,21 @@ from fastdataframe.polars._types import get_polars_type
 
 TFrame = TypeVar("TFrame", bound=pl.DataFrame | pl.LazyFrame)
 
+# Type alias for JSON schema values (can be dict, list, or primitives)
+JsonSchemaValue = dict[str, Any] | list[Any] | str | int | float | bool | None
 
-def _resolve_json_schema_refs(schema: Any, defs: dict | None = None) -> Any:
+
+def _resolve_json_schema_refs(
+    schema: JsonSchemaValue, defs: dict[str, Any] | None = None
+) -> JsonSchemaValue:
     """Resolve $ref references in a JSON schema by inlining the referenced schemas.
 
     Args:
-        schema: The JSON schema that may contain $ref
+        schema: The JSON schema value that may contain $ref (dict, list, or primitive)
         defs: The $defs section containing referenced schemas
 
     Returns:
-        dict: Schema with $ref references resolved inline
+        JsonSchemaValue: Schema with $ref references resolved inline
     """
     if defs is None:
         defs = {}
