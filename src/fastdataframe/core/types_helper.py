@@ -1,5 +1,6 @@
 """Helper functions for type checking and manipulation."""
 
+import types
 from typing import Any, Iterable, Optional, Type, get_origin, get_args, Annotated, Union
 
 
@@ -11,6 +12,9 @@ def is_optional_type(field_type: Any) -> bool:
 
     Returns:
         bool: True if the type is optional, False otherwise
+
+    Notes:
+        Handles both typing.Union (Optional[T]) and PEP 604 syntax (T | None).
     """
     origin = get_origin(field_type)
     args = get_args(field_type)
@@ -20,7 +24,8 @@ def is_optional_type(field_type: Any) -> bool:
         return is_optional_type(args[0])
 
     # Handle Union types (including Optional which is Union[T, None])
-    if origin is Union:
+    # and PEP 604 syntax (T | None) which uses types.UnionType
+    if origin in (Union, types.UnionType):
         return type(None) in args
 
     # Handle direct None type

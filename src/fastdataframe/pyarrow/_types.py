@@ -182,29 +182,22 @@ def get_pyarrow_type(
     if field_info.annotation is None:
         return pa.string()
 
-    # First try to handle BaseModel types
+    # Check for explicit PyArrow type override via metadata first
+    # This takes precedence over all automatic type conversions
+    for arg in field_info.metadata:
+        if isinstance(arg, pa.DataType):
+            return arg
+
+    # Handle BaseModel types
     if inspect.isclass(field_info.annotation) and issubclass(
         field_info.annotation, BaseModel
     ):
         return _convert_basemodel_to_struct(field_info.annotation, alias_type)
 
-    # Then try to handle collection types that need special processing
+    # Handle collection types that need special processing
     collection_type = _handle_collection_type(field_info.annotation, alias_type)
     if collection_type is not None:
         return collection_type
 
-    # Handle Optional types - unwrap to get the inner type
-    annotation = field_info.annotation
-    if is_optional_type(annotation):
-        args = get_args(annotation)
-        non_none_args = [arg for arg in args if arg is not type(None)]
-        if non_none_args:
-            annotation = non_none_args[0]
-
-    # Check for explicit PyArrow type override via metadata
-    for arg in field_info.metadata:
-        if isinstance(arg, pa.DataType):
-            return arg
-
-    # Use standard conversion
-    return _python_type_to_pyarrow(annotation, alias_type)
+    # Use standard conversion (handles Optional unwrapping and basic types)
+    return _python_type_to_pyarrow(field_info.annotation, alias_type)

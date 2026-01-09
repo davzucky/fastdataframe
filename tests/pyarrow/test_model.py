@@ -584,3 +584,115 @@ class TestSchemaUsageWithPyArrow:
 
         assert table.schema == schema
         assert pa.types.is_struct(table.schema.field("address").type)
+
+
+class TestPEP604UnionSyntax:
+    """Tests for PEP 604 union syntax (T | None) support."""
+
+    def test_pep604_optional_type_nullability(self) -> None:
+        """Test that PEP 604 syntax (T | None) is correctly detected as optional."""
+
+        class TestModel(PyArrowFastDataframeModel):
+            required_field: int
+            optional_field: int | None  # PEP 604 syntax
+
+        schema = TestModel.get_pyarrow_schema()
+
+        assert schema.field("required_field").nullable is False
+        assert schema.field("optional_field").nullable is True
+        assert schema.field("optional_field").type == pa.int64()
+
+    def test_pep604_mixed_with_optional(self) -> None:
+        """Test mixing PEP 604 syntax with typing.Optional."""
+
+        class TestModel(PyArrowFastDataframeModel):
+            pep604_field: str | None
+            optional_field: Optional[str]
+            required_field: str
+
+        schema = TestModel.get_pyarrow_schema()
+
+        # Both should be nullable
+        assert schema.field("pep604_field").nullable is True
+        assert schema.field("optional_field").nullable is True
+        assert schema.field("required_field").nullable is False
+
+        # Both should have correct types
+        assert schema.field("pep604_field").type == pa.string()
+        assert schema.field("optional_field").type == pa.string()
+
+    def test_pep604_with_complex_types(self) -> None:
+        """Test PEP 604 syntax with complex types like lists."""
+
+        class TestModel(PyArrowFastDataframeModel):
+            optional_list: list[int] | None
+            required_list: list[str]
+
+        schema = TestModel.get_pyarrow_schema()
+
+        assert schema.field("optional_list").nullable is True
+        assert schema.field("required_list").nullable is False
+        assert schema.field("optional_list").type == pa.list_(pa.int64())
+
+
+class TestMetadataOverride:
+    """Tests for explicit PyArrow type override via metadata."""
+
+    def test_metadata_override_basic_type(self) -> None:
+        """Test overriding basic type with metadata."""
+
+        class TestModel(PyArrowFastDataframeModel):
+            # Override default int64 with int32
+            small_int: Annotated[int, pa.int32()]
+            normal_int: int
+
+        schema = TestModel.get_pyarrow_schema()
+
+        assert schema.field("small_int").type == pa.int32()
+        assert schema.field("normal_int").type == pa.int64()
+
+    def test_metadata_override_collection_type(self) -> None:
+        """Test that metadata override takes precedence over collection types."""
+
+        class TestModel(PyArrowFastDataframeModel):
+            # Override list[int] with binary (for some serialization use case)
+            serialized_data: Annotated[list[int], pa.binary()]
+            normal_list: list[int]
+
+        schema = TestModel.get_pyarrow_schema()
+
+        assert schema.field("serialized_data").type == pa.binary()
+        assert schema.field("normal_list").type == pa.list_(pa.int64())
+
+    def test_metadata_override_basemodel_type(self) -> None:
+        """Test that metadata override takes precedence over BaseModel types."""
+
+        class Address(BaseModel):
+            street: str
+            city: str
+
+        class TestModel(PyArrowFastDataframeModel):
+            # Override BaseModel with string (for JSON storage)
+            json_address: Annotated[Address, pa.string()]
+            struct_address: Address
+
+        schema = TestModel.get_pyarrow_schema()
+
+        assert schema.field("json_address").type == pa.string()
+        assert pa.types.is_struct(schema.field("struct_address").type)
+
+    def test_metadata_override_with_different_arrow_types(self) -> None:
+        """Test various PyArrow type overrides."""
+
+        class TestModel(PyArrowFastDataframeModel):
+            as_float32: Annotated[float, pa.float32()]
+            as_int8: Annotated[int, pa.int8()]
+            as_large_string: Annotated[str, pa.large_string()]
+            as_date64: Annotated[dt.date, pa.date64()]
+
+        schema = TestModel.get_pyarrow_schema()
+
+        assert schema.field("as_float32").type == pa.float32()
+        assert schema.field("as_int8").type == pa.int8()
+        assert schema.field("as_large_string").type == pa.large_string()
+        assert schema.field("as_date64").type == pa.date64()
