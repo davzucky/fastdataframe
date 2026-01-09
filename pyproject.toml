@@ -28,6 +28,9 @@ classifiers = [
 polars = [
     "polars>=1.26.0",
 ]
+pyarrow = [
+    "pyarrow>=15.0.0",
+]
 iceberg = [
     "pyiceberg[pyarrow,sql-sqlite]>=0.9",
 ]
@@ -52,6 +55,7 @@ dev = [
     "pytest-cov>=6.1.1",
     "isodate>=0.7.2",
     "rich>=10.0",
+    "pyarrow>=15.0.0",
 ]
 
 [tool.pytest.ini_options]
