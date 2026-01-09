@@ -51,12 +51,7 @@ def _handle_collection_type(
     if origin is None or not args:
         return None
 
-    # Handle set[T] -> pa.list_(T) (sets are stored as lists in PyArrow)
-    if origin is set:
-        inner_type = _python_type_to_pyarrow(args[0], alias_type)
-        return pa.list_(inner_type)
-
-    # Handle collections of BaseModel types (list[BaseModel], etc.)
+    # Handle collection types (list, tuple, set) -> pa.list_()
     if origin in (list, tuple, set) and args:
         inner_type = args[0]
         if inspect.isclass(inner_type) and issubclass(inner_type, BaseModel):
@@ -148,22 +143,8 @@ def _convert_basemodel_to_struct(
         nullable = is_optional_type(field_info.annotation)
 
         # Get the PyArrow type for this field
-        field_type: pa.DataType
-        if field_info.annotation is None:
-            field_type = pa.string()
-        elif inspect.isclass(field_info.annotation) and issubclass(
-            field_info.annotation, BaseModel
-        ):
-            # Nested BaseModel - recursively convert
-            field_type = _convert_basemodel_to_struct(field_info.annotation, alias_type)
-        else:
-            # Check for collection types first
-            collection_type = _handle_collection_type(field_info.annotation, alias_type)
-            if collection_type is not None:
-                field_type = collection_type
-            else:
-                # Use standard conversion
-                field_type = _python_type_to_pyarrow(field_info.annotation, alias_type)
+        # Use standard conversion (handles None, collections, BaseModel, and basic types)
+        field_type = _python_type_to_pyarrow(field_info.annotation, alias_type)
 
         fields.append(pa.field(field_alias, field_type, nullable=nullable))
 
@@ -181,6 +162,21 @@ def get_pyarrow_type(
 
     Returns:
         PyArrowType: The corresponding PyArrow type
+
+    Notes:
+        If field_info.metadata contains a pa.DataType instance, it will be used
+        as an explicit override instead of automatic type conversion. This allows
+        fine-grained control over the PyArrow type mapping when needed.
+
+        Example:
+            ```python
+            from typing import Annotated
+            import pyarrow as pa
+
+            class MyModel(PyArrowFastDataframeModel):
+                # Override default int64 with int32
+                small_int: Annotated[int, pa.int32()]
+            ```
     """
     # Handle case where annotation is None
     if field_info.annotation is None:
