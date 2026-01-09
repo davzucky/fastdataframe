@@ -49,6 +49,19 @@ class TestIsOptionalType:
             (Union[List[Optional[int]], None], True),
             (Annotated[Optional[List[int]], "metadata"], True),
             (Annotated[Union[List[int], None], "metadata"], True),
+            # PEP 604 syntax (T | None) - Python 3.10+
+            (int | None, True),
+            (str | None, True),
+            (float | None, True),
+            (list[int] | None, True),
+            (dict[str, Any] | None, True),
+            # PEP 604 without None
+            (int | str, False),
+            (list[int] | dict[str, Any], False),
+            # PEP 604 with Annotated
+            (Annotated[int | None, "metadata"], True),
+            (Annotated[str | None, "metadata"], True),
+            (Annotated[int | str, "metadata"], False),
         ],
     )
     def test_is_optional_type(self, field_type: Any, expected: bool) -> None:
