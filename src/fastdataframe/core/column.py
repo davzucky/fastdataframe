@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from types import MappingProxyType
-from typing import Any, Iterator, Mapping
+from typing import Any, Iterator, Mapping, cast
 
 from pydantic.fields import FieldInfo
 from pydantic_core import PydanticUndefined
@@ -78,6 +78,13 @@ def get_column_info(field_info: FieldInfo) -> ColumnInfo:
     for metadata in field_info.metadata:
         if isinstance(metadata, ColumnInfo):
             return metadata
+
+    json_schema_extra = field_info.json_schema_extra
+    if isinstance(json_schema_extra, ColumnInfo):
+        return json_schema_extra
+    if isinstance(json_schema_extra, dict) and "_fastdataframe" in json_schema_extra:
+        return ColumnInfo.from_field_metadata(cast(dict[str, Any], json_schema_extra))
+
     return ColumnInfo.from_field_type(field_info)
 
 

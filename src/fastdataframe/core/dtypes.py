@@ -58,9 +58,8 @@ class Int64(Dtype):
     python_types: ClassVar[tuple[type[Any], ...]] = (int,)
 
 
-@dataclass(frozen=True)
-class Float32(Dtype):
-    python_types: ClassVar[tuple[type[Any], ...]] = (float,)
+class StrictFloatCompatibility:
+    """Mixin for dtypes that require strict float annotation identity."""
 
     def is_compatible_annotation(self, annotation: Any) -> bool:
         from fastdataframe.core.types_helper import unwrap_annotated_optional
@@ -70,14 +69,13 @@ class Float32(Dtype):
 
 
 @dataclass(frozen=True)
-class Float64(Dtype):
+class Float32(StrictFloatCompatibility, Dtype):
     python_types: ClassVar[tuple[type[Any], ...]] = (float,)
 
-    def is_compatible_annotation(self, annotation: Any) -> bool:
-        from fastdataframe.core.types_helper import unwrap_annotated_optional
 
-        annotation = unwrap_annotated_optional(annotation)
-        return annotation is float
+@dataclass(frozen=True)
+class Float64(StrictFloatCompatibility, Dtype):
+    python_types: ClassVar[tuple[type[Any], ...]] = (float,)
 
 
 @dataclass(frozen=True)

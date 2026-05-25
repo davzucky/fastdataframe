@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from types import MappingProxyType
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 from typing import Any, ClassVar, Generic, Literal, Mapping, Type, TypeVar, cast
 
 from pydantic import BaseModel, ConfigDict, create_model
@@ -90,8 +90,15 @@ class FastDataFrameModel(BaseModel):
 
     @classmethod
     def _configured_names(cls, key: str) -> frozenset[str]:
-        raw_value = getattr(cls, "model_config", {}).get(key, frozenset())
-        return frozenset(raw_value or frozenset())
+        raw_value = getattr(cls, "model_config", {}).get(key, None)
+        if raw_value is None or isinstance(raw_value, str):
+            return frozenset()
+        if not isinstance(raw_value, Iterable):
+            return frozenset()
+        names = tuple(raw_value)
+        if not all(isinstance(name, str) for name in names):
+            return frozenset()
+        return frozenset(names)
 
     @classmethod
     def deprecated_column_names(cls) -> frozenset[str]:

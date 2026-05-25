@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Annotated
 
 import polars as pl
+import pytest
 
 from fastdataframe import ColumnInfo, FastDataFrameModel, Int16
 import fastdataframe.polars as fpl
@@ -30,6 +31,13 @@ def test_functional_validate_schema_is_canonical() -> None:
 
     assert len(errors) == 1
     assert errors[0].column_name == "score"
+
+
+def test_functional_rename_is_strict_by_default() -> None:
+    df = pl.DataFrame({"user_id": [1], "extra": [1]})
+
+    with pytest.raises(KeyError, match="extra"):
+        fpl.rename(User, df)
 
 
 def test_functional_cast_uses_dtype() -> None:

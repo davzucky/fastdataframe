@@ -35,6 +35,15 @@ class TestColumnDefinitions:
         assert not hasattr(User, "column_definitions")
         assert FastUser.column_definitions[0].storage_name == "user_id"
 
+    def test_column_info_can_come_from_field_json_schema_extra(self) -> None:
+        class User(FastDataFrameModel):
+            user_id: Annotated[
+                int,
+                Field(json_schema_extra=ColumnInfo(dtype=Int32()).as_field_metadata()),
+            ]
+
+        assert User.column_definitions[0].info.dtype == Int32()
+
     def test_column_info_is_optional_and_defaulted(self) -> None:
         class User(FastDataFrameModel):
             user_id: int
@@ -110,20 +119,27 @@ class TestColumnLifecycle:
         with pytest.raises(ValueError, match="Deprecated field"):
             _ = Invalid.column_definitions
 
-    def test_reserved_removed_names_cannot_be_reused(self) -> None:
-        class DeprecatedName(FastDataFrameModel):
-            model_config = {"fastdataframe_deprecated_column_names": {"old_value"}}
+    @pytest.mark.parametrize(
+        "config_key",
+        [
+            "fastdataframe_deprecated_column_names",
+            "fastdataframe_removed_column_names",
+        ],
+    )
+    def test_reserved_removed_names_cannot_be_reused(self, config_key: str) -> None:
+        class ReservedName(FastDataFrameModel):
+            model_config = {config_key: {"old_value"}}
             old_value: int
 
         with pytest.raises(ValueError, match="Reserved column names"):
-            _ = DeprecatedName.column_definitions
+            _ = ReservedName.column_definitions
 
-        class RemovedName(FastDataFrameModel):
-            model_config = {"fastdataframe_removed_column_names": {"old_value"}}
+    def test_string_config_value_is_ignored_for_reserved_names(self) -> None:
+        class User(FastDataFrameModel):
+            model_config = {"fastdataframe_removed_column_names": "old_value"}
             old_value: int
 
-        with pytest.raises(ValueError, match="Reserved column names"):
-            _ = RemovedName.column_definitions
+        assert User.column_definitions[0].storage_name == "old_value"
 
 
 def test_different_dtype_can_refine_same_python_annotation() -> None:

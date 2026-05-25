@@ -178,6 +178,8 @@ def rename(
     df: pl.DataFrame | pl.LazyFrame,
     alias_type_from: AliasType = "serialization",
     alias_type_to: AliasType = "serialization",
+    *,
+    strict: bool = True,
 ) -> pl.DataFrame | pl.LazyFrame:
     """Rename dataframe columns between FastDataFrame name sets."""
     model_map = {
@@ -185,6 +187,10 @@ def rename(
         for column in model.column_definitions
     }
     df_schema = df.collect_schema()
+    missing = set(df_schema.keys()) - set(model_map.keys())
+    if strict and missing:
+        names = ", ".join(sorted(missing))
+        raise KeyError(f"DataFrame contains columns not defined by model: {names}")
     rename_map = {
         field_name: model_map[field_name]
         for field_name in df_schema.keys()
@@ -201,10 +207,11 @@ def cast(
     """Cast DataFrame or LazyFrame columns to match the model schema."""
     source_schema = df.collect_schema()
     target_schema = schema(model, alias_type)
-    column_infos = model.model_columns(alias_type)
     cast_functions = []
 
-    for target_col, target_type in target_schema.items():
+    for column in model.column_definitions:
+        target_col = _column_name(column, alias_type)
+        target_type = target_schema[target_col]
         if target_col not in source_schema:
             raise ValueError(f"Column {target_col} not found in source schema")
         if source_schema[target_col] == target_type:
@@ -218,7 +225,7 @@ def cast(
                 source_schema[target_col],
                 target_type,
                 target_col,
-                column_infos[target_col],
+                column.info,
             )
         )
 
@@ -306,7 +313,7 @@ class PolarsFastDataframeModel(FastDataframeModel):
             df = MyModel.rename(df, alias_type_from='validation', alias_type_to='serialization')
             ```
         """
-        return rename(cls, df, alias_type_from, alias_type_to)
+        return rename(cls, df, alias_type_from, alias_type_to, strict=False)
 
     @classmethod
     def cast(
