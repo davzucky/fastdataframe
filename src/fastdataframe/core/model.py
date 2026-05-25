@@ -1,10 +1,20 @@
-"""FastDataframe model implementation."""
+"""FastDataFrame model implementation."""
 
-from typing import Literal, Type, TypeVar
+from __future__ import annotations
 
-from pydantic import BaseModel, create_model
+from types import MappingProxyType
+from collections.abc import Callable
+from typing import Any, ClassVar, Generic, Literal, Mapping, Type, TypeVar, cast
+
+from pydantic import BaseModel, ConfigDict, create_model
 from pydantic.fields import FieldInfo
 
+from fastdataframe.core.column import (
+    ColumnDefinition,
+    NameAccessor,
+    build_column_definition,
+    get_column_info,
+)
 from fastdataframe.core.pydantic.field_info import (
     get_serialization_alias,
     get_validation_alias,
@@ -12,185 +22,225 @@ from fastdataframe.core.pydantic.field_info import (
 
 from .annotation import ColumnInfo
 
-T = TypeVar("T", bound="FastDataframeModel")
+T = TypeVar("T", bound="FastDataFrameModel")
 TBaseModel = TypeVar("TBaseModel", bound=BaseModel)
 AliasType = Literal["serialization", "validation"]
+NameType = Literal["storage", "serialization", "validation", "python"]
+
+
+TValue = TypeVar("TValue")
+
+
+class classproperty(Generic[TValue]):
+    """Read-only class-level property descriptor."""
+
+    def __init__(self, func: Callable[[type[Any]], TValue]) -> None:
+        self.func = func
+
+    def __get__(self, instance: object, owner: type | None = None) -> TValue:
+        if owner is None:
+            owner = type(instance)
+        return self.func(owner)
 
 
 def _get_column_info(field_info: FieldInfo) -> ColumnInfo:
-    for m in field_info.metadata:
-        if isinstance(m, ColumnInfo):
-            return m
-    return ColumnInfo.from_field_type(field_info)
+    """Backward-compatible helper for extracting ColumnInfo."""
+    return get_column_info(field_info)
 
 
-class FastDataframeModel(BaseModel):
-    """Base model that enforces FastDataframe annotation on all fields."""
+class FastDataFrameModel(BaseModel):
+    """Base model that owns FastDataFrame column definitions."""
+
+    model_config = ConfigDict(ignored_types=(classproperty,))
+
+    __fastdataframe_column_definitions__: ClassVar[
+        tuple[ColumnDefinition, ...] | None
+    ] = None
+    __fastdataframe_column_map__: ClassVar[Mapping[str, ColumnDefinition] | None] = None
+    __fastdataframe_serialization_names__: ClassVar[NameAccessor | None] = None
+    __fastdataframe_validation_names__: ClassVar[NameAccessor | None] = None
+    __fastdataframe_storage_names__: ClassVar[NameAccessor | None] = None
+    __fastdataframe_python_names__: ClassVar[NameAccessor | None] = None
+
+    def __init_subclass__(cls, **kwargs: Any) -> None:
+        eager_columns = bool(kwargs.pop("eager_columns", False))
+        super().__init_subclass__(**kwargs)
+        cls._clear_fastdataframe_cache()
+        config_eager = bool(
+            getattr(cls, "model_config", {}).get("fastdataframe_eager_columns", False)
+        )
+        if eager_columns or config_eager:
+            cls._build_column_definitions()
+
+    @classmethod
+    def model_rebuild(cls, *args: Any, **kwargs: Any) -> bool | None:
+        """Rebuild the Pydantic model and clear derived FastDataFrame metadata."""
+        result = super().model_rebuild(*args, **kwargs)
+        cls._clear_fastdataframe_cache()
+        return result
+
+    @classmethod
+    def _clear_fastdataframe_cache(cls) -> None:
+        cls.__fastdataframe_column_definitions__ = None
+        cls.__fastdataframe_column_map__ = None
+        cls.__fastdataframe_serialization_names__ = None
+        cls.__fastdataframe_validation_names__ = None
+        cls.__fastdataframe_storage_names__ = None
+        cls.__fastdataframe_python_names__ = None
+
+    @classmethod
+    def _configured_names(cls, key: str) -> frozenset[str]:
+        raw_value = getattr(cls, "model_config", {}).get(key, frozenset())
+        return frozenset(raw_value or frozenset())
+
+    @classmethod
+    def deprecated_column_names(cls) -> frozenset[str]:
+        """Column names removed from the model but reserved from reuse."""
+        return cls._configured_names("fastdataframe_deprecated_column_names")
+
+    @classmethod
+    def removed_column_names(cls) -> frozenset[str]:
+        """Column names eligible for explicit destructive backend deletion."""
+        return cls._configured_names("fastdataframe_removed_column_names")
+
+    @classmethod
+    def _build_column_definitions(cls) -> tuple[ColumnDefinition, ...]:
+        columns = tuple(
+            build_column_definition(field_name, field_info)
+            for field_name, field_info in cls.model_fields.items()
+        )
+
+        seen_storage_names: set[str] = set()
+        for column in columns:
+            if column.storage_name in seen_storage_names:
+                raise ValueError(
+                    f"Duplicate storage column name: {column.storage_name}"
+                )
+            seen_storage_names.add(column.storage_name)
+
+        reserved_names = cls.deprecated_column_names() | cls.removed_column_names()
+        reused_reserved = seen_storage_names & reserved_names
+        if reused_reserved:
+            names = ", ".join(sorted(reused_reserved))
+            raise ValueError(f"Reserved column names cannot be reused: {names}")
+
+        column_map = {column.storage_name: column for column in columns}
+        cls.__fastdataframe_column_definitions__ = columns
+        cls.__fastdataframe_column_map__ = MappingProxyType(column_map)
+        cls.__fastdataframe_serialization_names__ = NameAccessor(
+            {column.python_name: column.serialization_name for column in columns}
+        )
+        cls.__fastdataframe_validation_names__ = NameAccessor(
+            {column.python_name: column.validation_name for column in columns}
+        )
+        cls.__fastdataframe_storage_names__ = NameAccessor(
+            {column.python_name: column.storage_name for column in columns}
+        )
+        cls.__fastdataframe_python_names__ = NameAccessor(
+            {column.python_name: column.python_name for column in columns}
+        )
+        return columns
+
+    @classproperty
+    def column_definitions(cls) -> tuple[ColumnDefinition, ...]:
+        """Ordered immutable ColumnDefinitions for this model."""
+        if cls.__fastdataframe_column_definitions__ is None:
+            return cls._build_column_definitions()
+        return cls.__fastdataframe_column_definitions__
+
+    @classproperty
+    def column_map(cls) -> Mapping[str, ColumnDefinition]:
+        """Read-only mapping from storage name to ColumnDefinition."""
+        if cls.__fastdataframe_column_map__ is None:
+            cls._build_column_definitions()
+        assert cls.__fastdataframe_column_map__ is not None
+        return cls.__fastdataframe_column_map__
+
+    @classproperty
+    def serialization_names(cls) -> NameAccessor:
+        """Resolved serialization names keyed by Python field name."""
+        if cls.__fastdataframe_serialization_names__ is None:
+            cls._build_column_definitions()
+        assert cls.__fastdataframe_serialization_names__ is not None
+        return cls.__fastdataframe_serialization_names__
+
+    @classproperty
+    def validation_names(cls) -> NameAccessor:
+        """Resolved validation names keyed by Python field name."""
+        if cls.__fastdataframe_validation_names__ is None:
+            cls._build_column_definitions()
+        assert cls.__fastdataframe_validation_names__ is not None
+        return cls.__fastdataframe_validation_names__
+
+    @classproperty
+    def storage_names(cls) -> NameAccessor:
+        """Resolved storage names keyed by Python field name."""
+        if cls.__fastdataframe_storage_names__ is None:
+            cls._build_column_definitions()
+        assert cls.__fastdataframe_storage_names__ is not None
+        return cls.__fastdataframe_storage_names__
+
+    @classproperty
+    def python_names(cls) -> NameAccessor:
+        """Python field names keyed by Python field name."""
+        if cls.__fastdataframe_python_names__ is None:
+            cls._build_column_definitions()
+        assert cls.__fastdataframe_python_names__ is not None
+        return cls.__fastdataframe_python_names__
 
     @classmethod
     def from_base_model(cls: Type[T], model: type[TBaseModel]) -> type[T]:
-        """Convert a Pydantic BaseModel to a FastDataframeModel subclass.
-
-        This method creates a new FastDataframeModel class that inherits from the calling class
-        and includes all the fields from the provided Pydantic model. This is useful for creating
-        dataframe-specific versions of existing Pydantic models while preserving their schema
-        and validation rules.
-
-        The method extracts field definitions from the source model and creates a new model
-        using Pydantic's `create_model` function. The new model will have the same field types,
-        validation rules, and metadata as the original model, but will also inherit the
-        FastDataframe-specific functionality from the calling class.
-
-        Args:
-            cls: The FastDataframeModel subclass to inherit from (e.g., PolarsFastDataframeModel)
-            model: A Pydantic BaseModel class to convert from
-
-        Returns:
-            A new FastDataframeModel subclass that combines the schema of the input model
-            with the functionality of the calling class.
-
-        Example:
-            ```python
-            from pydantic import BaseModel
-            from fastdataframe.polars.model import PolarsFastDataframeModel
-
-            # Define a base Pydantic model
-            class User(BaseModel):
-                id: int
-                name: str
-                age: int
-                is_active: bool = True
-
-            # Convert to a Polars-compatible model
-            PolarsUser = PolarsFastDataframeModel.from_base_model(User)
-
-            # The new model has all the original fields plus Polars functionality
-            assert issubclass(PolarsUser, PolarsFastDataframeModel)
-            assert PolarsUser.__name__ == "UserPolars"
-            assert "id" in PolarsUser.model_fields
-            assert "name" in PolarsUser.model_fields
-            assert "age" in PolarsUser.model_fields
-            assert "is_active" in PolarsUser.model_fields
-
-            # You can now use it with Polars dataframes
-            import polars as pl
-            df = pl.DataFrame({
-                "id": [1, 2, 3],
-                "name": ["Alice", "Bob", "Charlie"],
-                "age": [25, 30, 35],
-                "is_active": [True, False, True]
-            })
-
-            # Validate the dataframe against the model
-            errors = PolarsUser.validate_schema(df)
-            if not errors:
-                print("DataFrame is valid!")
-            ```
-
-        Notes:
-            - The new model's name will be "{original_model_name}{base_class_suffix}"
-              where the suffix is derived from the calling class name (e.g., "Polars" for PolarsFastDataframeModel)
-            - All field types, validation rules, and metadata from the original model are preserved
-            - The new model inherits all FastDataframe-specific methods from the calling class
-            - This method is commonly used to create dataframe-specific versions of existing Pydantic models
-            - The generated model maintains the same JSON schema as the original model
-        """
-
+        """Create a schema-only FastDataFrame model from a Pydantic model."""
         field_definitions = {
             field_name: (field_type.annotation, field_type)
             for field_name, field_type in model.model_fields.items()
         }
-        base_model_name = cls.__name__[: -len("FastDataframeModel")]
-        new_model: type[T] = create_model(
-            f"{model.__name__}{base_model_name}",
+        new_model = create_model(  # type: ignore[no-matching-overload]
+            f"{model.__name__}FastDataFrame",
             __base__=cls,
-            __doc__=f"{base_model_name} version of {model.__name__}",
+            __doc__=f"FastDataFrame version of {model.__name__}",
             **field_definitions,
-        )  # type: ignore[call-overload]
-        return new_model
+        )
+        return cast(type[T], new_model)
 
     @classmethod
     def model_columns(
         cls, alias_type: AliasType = "serialization"
     ) -> dict[str, ColumnInfo]:
-        """Extract column information from the model's fields with alias support.
-
-        This method returns a dictionary mapping column names (using the specified alias type)
-        to their corresponding ColumnInfo objects. It processes all fields in the model and
-        extracts their metadata, including any FastDataframe-specific annotations like
-        uniqueness constraints, boolean string mappings, and date formats.
-
-        The method supports two alias types:
-        - "serialization": Uses serialization aliases (default names for storage/export)
-        - "validation": Uses validation aliases (names used during data validation)
-
-        This is useful for:
-        - Understanding the schema of a model's columns
-        - Extracting metadata for dataframe operations
-        - Validating column configurations
-        - Building schema-aware data processing pipelines
-
-        Args:
-            alias_type: The type of alias to use for column names.
-                - "serialization": Use serialization aliases (default)
-                - "validation": Use validation aliases
-
-        Returns:
-            A dictionary mapping column names (using the specified alias) to ColumnInfo objects.
-            Each ColumnInfo contains metadata about the column including type information,
-            uniqueness constraints, and any custom FastDataframe annotations.
-
-        Example:
-            ```python
-            from fastdataframe import FastDataframeModel, ColumnInfo
-            from typing import Optional, Annotated
-
-            class UserModel(FastDataframeModel):
-                user_id: Annotated[int, ColumnInfo(is_unique=True)]
-                name: str
-                age: Optional[int] = None
-                is_active: Annotated[bool, ColumnInfo(
-                    bool_true_string="1",
-                    bool_false_string="0"
-                )]
-                birth_date: Annotated[str, ColumnInfo(date_format="%Y-%m-%d")]
-
-            # Get column information with serialization aliases
-            columns = UserModel.model_columns(alias_type="serialization")
-
-            # The result contains column names and their metadata
-            assert "user_id" in columns
-            assert columns["user_id"].is_unique is True
-            assert columns["is_active"].bool_true_string == "1"
-            assert columns["is_active"].bool_false_string == "0"
-            assert columns["birth_date"].date_format == "%Y-%m-%d"
-
-            # Get column information with validation aliases (if different)
-            validation_columns = UserModel.model_columns(alias_type="validation")
-
-            # Use the column information for dataframe operations
-            for column_name, column_info in columns.items():
-                print(f"Column: {column_name}")
-                print(f"  Is unique: {column_info.is_unique}")
-                print(f"  Date format: {column_info.date_format}")
-            ```
-
-        Notes:
-            - Column names are determined by the alias type specified
-            - Fields without explicit ColumnInfo annotations get default ColumnInfo objects
-            - The method processes all model fields, including inherited ones
-            - ColumnInfo objects contain metadata useful for dataframe operations
-            - This method is commonly used by dataframe-specific subclasses (Polars, Iceberg)
-            - The returned dictionary preserves the order of fields in the model
-        """
-
-        columns = {}
-        alias_func = (
-            get_serialization_alias
-            if alias_type == "serialization"
-            else get_validation_alias
+        """Extract column information with backwards-compatible alias support."""
+        name_attr = (
+            "serialization_name" if alias_type == "serialization" else "validation_name"
         )
-        for field_name, field_info in cls.model_fields.items():
-            col_info = _get_column_info(field_info)
-            columns[alias_func(field_info, field_name)] = col_info
-        return columns
+        return {
+            getattr(column, name_attr): column.info for column in cls.column_definitions
+        }
+
+    @classmethod
+    def columns_by_name(
+        cls, name_type: NameType = "storage"
+    ) -> dict[str, ColumnDefinition]:
+        """Return ColumnDefinitions keyed by a selected resolved name."""
+        if name_type == "storage":
+            return {column.storage_name: column for column in cls.column_definitions}
+        if name_type == "serialization":
+            return {
+                column.serialization_name: column for column in cls.column_definitions
+            }
+        if name_type == "validation":
+            return {column.validation_name: column for column in cls.column_definitions}
+        return {column.python_name: column for column in cls.column_definitions}
+
+
+# Backwards-compatible spelling used by the existing package.
+FastDataframeModel = FastDataFrameModel
+
+
+__all__ = [
+    "AliasType",
+    "FastDataFrameModel",
+    "FastDataframeModel",
+    "NameType",
+    "_get_column_info",
+    "get_serialization_alias",
+    "get_validation_alias",
+]

@@ -2,8 +2,11 @@
 
 from dataclasses import dataclass
 from typing import Any, Self, cast
-from pydantic._internal._fields import PydanticMetadata
+
 from annotated_types import BaseMetadata
+from pydantic._internal._fields import PydanticMetadata
+
+from fastdataframe.core.dtypes import Dtype
 
 
 @dataclass(frozen=True)
@@ -21,6 +24,9 @@ class ColumnInfo(PydanticMetadata, BaseMetadata):
     bool_true_string: str = "true"
     bool_false_string: str = "false"
     date_format: str = "%Y-%m-%d"
+    dtype: Dtype | None = None
+    deprecated: bool = False
+    iceberg_id: int | None = None
 
     def __get_pydantic_core_schema__(
         self, source_type: Any, handler: Any
@@ -42,6 +48,7 @@ class ColumnInfo(PydanticMetadata, BaseMetadata):
         # Add both the properties and a reconstruction document
         schema["json_schema_extra"] = {
             "is_unique": self.is_unique,
+            "deprecated": self.deprecated,
             # Add a document that can be used to reconstruct the FastDataframe
             "_fastdataframe": {
                 "type": "FastDataframe",
@@ -135,4 +142,5 @@ class ColumnInfo(PydanticMetadata, BaseMetadata):
                 },
             },
             "is_unique": self.is_unique,
+            "deprecated": self.deprecated,
         }

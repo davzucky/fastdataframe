@@ -9,11 +9,27 @@ import pyarrow as pa
 from pydantic import BaseModel
 from pydantic.fields import FieldInfo
 
+from fastdataframe.core.column import ColumnDefinition
+from fastdataframe.core.dtypes import (
+    Binary,
+    Boolean,
+    Date,
+    Decimal,
+    Float32,
+    Float64,
+    Int8,
+    Int16,
+    Int32,
+    Int64,
+    String,
+    Time,
+    Timestamp,
+)
 from fastdataframe.core.pydantic.field_info import (
     get_serialization_alias,
     get_validation_alias,
 )
-from fastdataframe.core.types_helper import is_optional_type
+from fastdataframe.core.types_helper import is_optional_type, unwrap_annotated_optional
 
 type PyArrowType = pa.DataType
 
@@ -149,6 +165,48 @@ def _convert_basemodel_to_struct(
         fields.append(pa.field(field_alias, field_type, nullable=nullable))
 
     return pa.struct(fields)
+
+
+def get_pyarrow_type_from_column(
+    column: ColumnDefinition, alias_type: str = "serialization"
+) -> PyArrowType:
+    """Convert a ColumnDefinition to a PyArrow type."""
+    for metadata in column.field_info.metadata:
+        if isinstance(metadata, pa.DataType):
+            return metadata
+
+    dtype = column.info.dtype
+    if dtype is not None:
+        if isinstance(dtype, Boolean):
+            return pa.bool_()
+        if isinstance(dtype, String):
+            return pa.string()
+        if isinstance(dtype, Binary):
+            return pa.binary()
+        if isinstance(dtype, Int8):
+            return pa.int8()
+        if isinstance(dtype, Int16):
+            return pa.int16()
+        if isinstance(dtype, Int32):
+            return pa.int32()
+        if isinstance(dtype, Int64):
+            return pa.int64()
+        if isinstance(dtype, Float32):
+            return pa.float32()
+        if isinstance(dtype, Float64):
+            return pa.float64()
+        if isinstance(dtype, Date):
+            return pa.date32()
+        if isinstance(dtype, Time):
+            return pa.time64("us")
+        if isinstance(dtype, Timestamp):
+            return pa.timestamp("us", tz=dtype.timezone)
+        if isinstance(dtype, Decimal):
+            return pa.decimal128(dtype.precision, dtype.scale)
+
+    return _python_type_to_pyarrow(
+        unwrap_annotated_optional(column.annotation), alias_type
+    )
 
 
 def get_pyarrow_type(

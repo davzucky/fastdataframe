@@ -4,10 +4,27 @@ import polars as pl
 import inspect
 import datetime as dt
 from typing import get_origin, get_args, Any, Union
+from fastdataframe.core.column import ColumnDefinition
+from fastdataframe.core.dtypes import (
+    Binary,
+    Boolean,
+    Date,
+    Decimal,
+    Float32,
+    Float64,
+    Int8,
+    Int16,
+    Int32,
+    Int64,
+    String,
+    Time,
+    Timestamp,
+)
 from fastdataframe.core.pydantic.field_info import (
     get_serialization_alias,
     get_validation_alias,
 )
+from fastdataframe.core.types_helper import unwrap_annotated_optional
 
 type PolarsType = pl.DataType | pl.DataTypeClass
 
@@ -109,6 +126,54 @@ def _handle_basemodel_type(annotation: Any) -> PolarsType | None:
     if inspect.isclass(annotation) and issubclass(annotation, BaseModel):
         return _convert_basemodel_to_struct(annotation)
     return None
+
+
+def get_polars_type_from_column(
+    column: ColumnDefinition, alias_type: str = "serialization"
+) -> PolarsType:
+    """Convert a ColumnDefinition to a Polars type."""
+    dtype = column.info.dtype
+    if dtype is not None:
+        if isinstance(dtype, Boolean):
+            return pl.Boolean
+        if isinstance(dtype, String):
+            return pl.String
+        if isinstance(dtype, Binary):
+            return pl.Binary
+        if isinstance(dtype, Int8):
+            return pl.Int8
+        if isinstance(dtype, Int16):
+            return pl.Int16
+        if isinstance(dtype, Int32):
+            return pl.Int32
+        if isinstance(dtype, Int64):
+            return pl.Int64
+        if isinstance(dtype, Float32):
+            return pl.Float32
+        if isinstance(dtype, Float64):
+            return pl.Float64
+        if isinstance(dtype, Date):
+            return pl.Date
+        if isinstance(dtype, Time):
+            return pl.Time
+        if isinstance(dtype, Timestamp):
+            return pl.Datetime(time_zone=dtype.timezone)
+        if isinstance(dtype, Decimal):
+            return pl.Decimal(dtype.precision, dtype.scale)
+
+    return _annotation_to_polars_type(
+        unwrap_annotated_optional(column.annotation),
+        column.field_info.metadata,
+        alias_type,
+    )
+
+
+def _annotation_to_polars_type(
+    annotation: Any, metadata: list[Any], alias_type: str = "serialization"
+) -> PolarsType:
+    field_info = FieldInfo(annotation=annotation)
+    field_info.metadata = metadata
+    return get_polars_type(field_info, alias_type)
 
 
 def get_polars_type(
