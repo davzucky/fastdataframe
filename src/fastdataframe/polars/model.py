@@ -282,6 +282,8 @@ class PolarsFastDataframeModel(FastDataframeModel):
         df: pl.DataFrame | pl.LazyFrame,
         alias_type_from: AliasType = "serialization",
         alias_type_to: AliasType = "serialization",
+        *,
+        strict: bool = False,
     ) -> pl.DataFrame | pl.LazyFrame:
         """Rename dataframe columns between different alias types according to the model's schema.
 
@@ -296,13 +298,17 @@ class PolarsFastDataframeModel(FastDataframeModel):
                 - 'validation' for validation/processing names
             alias_type_to: The target alias type to convert column names to.
                 Uses same options as alias_type_from.
+            strict: Whether to raise a KeyError when the dataframe contains columns
+                that are not defined by the model. Defaults to False for backwards
+                compatibility with the previous classmethod behavior.
 
         Returns:
             pl.DataFrame | pl.LazyFrame: New dataframe with renamed columns. Maintains original type
             (eager DataFrame or LazyFrame) of input.
 
         Raises:
-            KeyError: If any existing column name is not found in the model's schema
+            KeyError: If strict=True and any existing column name is not found in
+                the model's schema.
 
         Example:
             ```python
@@ -313,7 +319,7 @@ class PolarsFastDataframeModel(FastDataframeModel):
             df = MyModel.rename(df, alias_type_from='validation', alias_type_to='serialization')
             ```
         """
-        return rename(cls, df, alias_type_from, alias_type_to, strict=False)
+        return rename(cls, df, alias_type_from, alias_type_to, strict=strict)
 
     @classmethod
     def cast(

@@ -53,6 +53,13 @@ class TestColumnDefinitions:
         assert isinstance(column.info, ColumnInfo)
         assert column.info.dtype is None
 
+    def test_integer_dtype_rejects_bool_annotation(self) -> None:
+        class Invalid(FastDataFrameModel):
+            flag: Annotated[bool, ColumnInfo(dtype=Int32())]
+
+        with pytest.raises(ValueError, match="not compatible"):
+            _ = Invalid.column_definitions
+
     def test_dtype_must_be_compatible_with_annotation(self) -> None:
         class Valid(FastDataFrameModel):
             user_id: Annotated[int, ColumnInfo(dtype=Int32())]

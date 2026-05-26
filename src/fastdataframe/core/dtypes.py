@@ -18,6 +18,8 @@ class Dtype:
         from fastdataframe.core.types_helper import unwrap_annotated_optional
 
         annotation = unwrap_annotated_optional(annotation)
+        if annotation is bool:
+            return bool in self.python_types
         return isinstance(annotation, type) and issubclass(
             annotation, self.python_types
         )
