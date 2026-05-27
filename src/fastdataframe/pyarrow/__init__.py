@@ -1,9 +1,5 @@
-"""PyArrow integration for FastDataframe.
+"""PyArrow integration for FastDataFrame."""
 
-This module provides PyArrow-specific functionality for working with
-Pydantic models as PyArrow schemas.
-"""
+from .model import PyArrowFastDataframeModel, schema, string_schema
 
-from fastdataframe.pyarrow.model import PyArrowFastDataframeModel
-
-__all__ = ["PyArrowFastDataframeModel"]
+__all__ = ["PyArrowFastDataframeModel", "schema", "string_schema"]

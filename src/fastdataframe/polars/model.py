@@ -1,25 +1,27 @@
 """PolarsFastDataframeModel implementation."""
 
 from fastdataframe.core.model import AliasType, FastDataframeModel
-from fastdataframe.core.pydantic.field_info import (
-    get_serialization_alias,
-    get_validation_alias,
-)
 from fastdataframe.core.validation import ValidationError, ValidationResult
 import polars as pl
-from typing import TypeVar, Union, Any
-from pydantic import TypeAdapter
+from typing import TypeVar, Union, Any, cast as typing_cast
+from pydantic import BaseModel, TypeAdapter, create_model
 from fastdataframe.core.json_schema import (
     validate_missing_columns,
     validate_column_types,
 )
 from fastdataframe.polars._cast_functions import custom_cast_functions, simple_cast
-from fastdataframe.polars._types import get_polars_type
+from fastdataframe.polars._types import get_polars_type_from_column
 
 TFrame = TypeVar("TFrame", bound=pl.DataFrame | pl.LazyFrame)
 
 # Type alias for JSON schema values (can be dict, list, or primitives)
 JsonSchemaValue = dict[str, Any] | list[Any] | str | int | float | bool | None
+
+
+def _column_name(column: Any, alias_type: AliasType = "serialization") -> str:
+    if alias_type == "validation":
+        return column.validation_name
+    return column.storage_name
 
 
 def _resolve_json_schema_refs(
@@ -105,8 +107,148 @@ def _extract_polars_frame_json_schema(frame: pl.LazyFrame | pl.DataFrame) -> dic
     }
 
 
+def validate_schema(
+    model: type[FastDataframeModel],
+    frame: pl.LazyFrame | pl.DataFrame,
+    *,
+    canonical: bool = True,
+) -> list[ValidationError]:
+    """Validate a Polars frame schema against a FastDataFrame model."""
+    model_json_schema = model.model_json_schema()
+    df_json_schema = _extract_polars_frame_json_schema(frame)
+
+    defs = model_json_schema.get("$defs", {})
+    if defs:
+        resolved_properties = {}
+        for prop_name, prop_schema in model_json_schema.get("properties", {}).items():
+            resolved_properties[prop_name] = _resolve_json_schema_refs(
+                prop_schema, defs
+            )
+        resolved_model_schema = model_json_schema.copy()
+        resolved_model_schema["properties"] = resolved_properties
+        model_json_schema = resolved_model_schema
+
+    if canonical:
+        storage_names = [column.storage_name for column in model.column_definitions]
+        model_json_schema = model_json_schema.copy()
+        model_json_schema["required"] = storage_names
+        if "properties" in model_json_schema:
+            model_json_schema["properties"] = {
+                column.storage_name: model_json_schema["properties"].get(
+                    column.python_name,
+                    model_json_schema["properties"].get(column.storage_name, {}),
+                )
+                for column in model.column_definitions
+            }
+
+    errors = {}
+    errors.update(validate_missing_columns(model_json_schema, df_json_schema))
+    errors.update(validate_column_types(model_json_schema, df_json_schema))
+    return list(errors.values())
+
+
+def schema(
+    model: type[FastDataframeModel], alias_type: AliasType = "serialization"
+) -> pl.Schema:
+    """Generate a Polars schema from a FastDataFrame model."""
+    return pl.Schema(
+        {
+            _column_name(column, alias_type): get_polars_type_from_column(
+                column, alias_type
+            )
+            for column in model.column_definitions
+        }
+    )
+
+
+def string_schema(
+    model: type[FastDataframeModel], alias_type: AliasType = "serialization"
+) -> pl.Schema:
+    """Generate a Polars schema where every model column is String."""
+    return pl.Schema(
+        {
+            _column_name(column, alias_type): pl.String
+            for column in model.column_definitions
+        }
+    )
+
+
+def rename(
+    model: type[FastDataframeModel],
+    df: pl.DataFrame | pl.LazyFrame,
+    alias_type_from: AliasType = "serialization",
+    alias_type_to: AliasType = "serialization",
+    *,
+    strict: bool = True,
+) -> pl.DataFrame | pl.LazyFrame:
+    """Rename dataframe columns between FastDataFrame name sets."""
+    model_map = {
+        _column_name(column, alias_type_from): _column_name(column, alias_type_to)
+        for column in model.column_definitions
+    }
+    df_schema = df.collect_schema()
+    missing = set(df_schema.keys()) - set(model_map.keys())
+    if strict and missing:
+        names = ", ".join(sorted(missing))
+        raise KeyError(f"DataFrame contains columns not defined by model: {names}")
+    rename_map = {
+        field_name: model_map[field_name]
+        for field_name in df_schema.keys()
+        if field_name in model_map
+    }
+    return df.rename(rename_map)
+
+
+def cast(
+    model: type[FastDataframeModel],
+    df: Union[pl.DataFrame, pl.LazyFrame],
+    alias_type: AliasType = "serialization",
+) -> Union[pl.DataFrame, pl.LazyFrame]:
+    """Cast DataFrame or LazyFrame columns to match the model schema."""
+    source_schema = df.collect_schema()
+    target_schema = schema(model, alias_type)
+    cast_functions = []
+
+    for column in model.column_definitions:
+        target_col = _column_name(column, alias_type)
+        target_type = target_schema[target_col]
+        if target_col not in source_schema:
+            raise ValueError(f"Column {target_col} not found in source schema")
+        if source_schema[target_col] == target_type:
+            continue
+        cast_function = custom_cast_functions.get(
+            (type(source_schema[target_col]), type(target_type)), simple_cast
+        )
+
+        cast_functions.append(
+            cast_function(
+                source_schema[target_col],
+                target_type,
+                target_col,
+                column.info,
+            )
+        )
+
+    return df.with_columns(cast_functions)
+
+
 class PolarsFastDataframeModel(FastDataframeModel):
     """A model that extends FastDataframeModel for Polars integration."""
+
+    @classmethod
+    def from_base_model(cls, model: type[BaseModel]):
+        """Create a Polars-compatible model from a Pydantic model."""
+        field_definitions = {
+            field_name: (field_type.annotation, field_type)
+            for field_name, field_type in model.model_fields.items()
+        }
+        new_model = create_model(  # type: ignore[no-matching-overload]
+            f"{model.__name__}Polars",
+            __base__=cls,
+            __doc__=f"Polars version of {model.__name__}",
+            **field_definitions,
+        )
+        return typing_cast(type[PolarsFastDataframeModel], new_model)
 
     @classmethod
     def validate_schema(
@@ -120,66 +262,19 @@ class PolarsFastDataframeModel(FastDataframeModel):
         Returns:
             List[ValidationError]: A list of validation errors.
         """
-        model_json_schema = cls.model_json_schema()
-        df_json_schema = _extract_polars_frame_json_schema(frame)
-
-        # Resolve $ref references in the model schema to match DataFrame schema format
-        defs = model_json_schema.get("$defs", {})
-        if defs:
-            # Resolve references in properties
-            resolved_properties = {}
-            for prop_name, prop_schema in model_json_schema.get(
-                "properties", {}
-            ).items():
-                resolved_properties[prop_name] = _resolve_json_schema_refs(
-                    prop_schema, defs
-                )
-
-            # Create a new model schema with resolved references
-            resolved_model_schema = model_json_schema.copy()
-            resolved_model_schema["properties"] = resolved_properties
-            model_json_schema = resolved_model_schema
-
-        # Collect all validation errors
-        errors = {}
-        errors.update(validate_missing_columns(model_json_schema, df_json_schema))
-        errors.update(validate_column_types(model_json_schema, df_json_schema))
-
-        return list(errors.values())
+        return validate_schema(cls, frame, canonical=False)
 
     @classmethod
     def get_polars_schema(cls, alias_type: AliasType = "serialization") -> pl.Schema:
         """Get the polars schema for the model."""
-        alias_func = (
-            get_serialization_alias
-            if alias_type == "serialization"
-            else get_validation_alias
-        )
-        return pl.Schema(
-            {
-                alias_func(field_info, field_name): get_polars_type(
-                    field_info, alias_type
-                )
-                for field_name, field_info in cls.model_fields.items()
-            }
-        )
+        return schema(cls, alias_type)
 
     @classmethod
     def get_stringified_schema(
         cls, alias_type: AliasType = "serialization"
     ) -> pl.Schema:
         """Get the polars schema for the model with all columns as strings."""
-        alias_func = (
-            get_serialization_alias
-            if alias_type == "serialization"
-            else get_validation_alias
-        )
-        return pl.Schema(
-            {
-                alias_func(field_info, field_name): pl.String
-                for field_name, field_info in cls.model_fields.items()
-            }
-        )
+        return string_schema(cls, alias_type)
 
     @classmethod
     def rename(
@@ -187,6 +282,8 @@ class PolarsFastDataframeModel(FastDataframeModel):
         df: pl.DataFrame | pl.LazyFrame,
         alias_type_from: AliasType = "serialization",
         alias_type_to: AliasType = "serialization",
+        *,
+        strict: bool = False,
     ) -> pl.DataFrame | pl.LazyFrame:
         """Rename dataframe columns between different alias types according to the model's schema.
 
@@ -201,13 +298,17 @@ class PolarsFastDataframeModel(FastDataframeModel):
                 - 'validation' for validation/processing names
             alias_type_to: The target alias type to convert column names to.
                 Uses same options as alias_type_from.
+            strict: Whether to raise a KeyError when the dataframe contains columns
+                that are not defined by the model. Defaults to False for backwards
+                compatibility with the previous classmethod behavior.
 
         Returns:
             pl.DataFrame | pl.LazyFrame: New dataframe with renamed columns. Maintains original type
             (eager DataFrame or LazyFrame) of input.
 
         Raises:
-            KeyError: If any existing column name is not found in the model's schema
+            KeyError: If strict=True and any existing column name is not found in
+                the model's schema.
 
         Example:
             ```python
@@ -218,29 +319,7 @@ class PolarsFastDataframeModel(FastDataframeModel):
             df = MyModel.rename(df, alias_type_from='validation', alias_type_to='serialization')
             ```
         """
-        alias_func_from = (
-            get_serialization_alias
-            if alias_type_from == "serialization"
-            else get_validation_alias
-        )
-        alias_func_to = (
-            get_serialization_alias
-            if alias_type_to == "serialization"
-            else get_validation_alias
-        )
-        model_map = {
-            alias_func_from(field_info, field_name): alias_func_to(
-                field_info, field_name
-            )
-            for field_name, field_info in cls.__pydantic_fields__.items()
-        }
-        df_schema = df.collect_schema()
-        rename_map = {
-            field_name: model_map[field_name]
-            for field_name in df_schema.keys()
-            if field_name in model_map
-        }
-        return df.rename(rename_map)
+        return rename(cls, df, alias_type_from, alias_type_to, strict=strict)
 
     @classmethod
     def cast(
@@ -321,32 +400,7 @@ class PolarsFastDataframeModel(FastDataframeModel):
             - The method preserves the original dataframe's structure and only modifies
               column types as needed
         """
-        source_schema = df.collect_schema()
-        target_schema = cls.get_polars_schema(alias_type)
-        column_infos = cls.model_columns(alias_type)
-        cast_functions = []
-
-        for target_col, target_type in target_schema.items():
-            if target_col not in source_schema:
-                raise ValueError(f"Column {target_col} not found in source schema")
-            if source_schema[target_col] == target_type:
-                continue
-            cast_function = custom_cast_functions.get(
-                (type(source_schema[target_col]), type(target_type)), simple_cast
-            )
-
-            cast_functions.append(
-                cast_function(
-                    source_schema[target_col],
-                    target_type,
-                    target_col,
-                    column_infos[target_col],
-                )
-            )
-
-        df = df.with_columns(cast_functions)
-
-        return df
+        return cast(cls, df, alias_type)
 
     @classmethod
     def validate_data(cls, df: pl.DataFrame) -> ValidationResult:

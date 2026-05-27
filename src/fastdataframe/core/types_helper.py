@@ -4,6 +4,31 @@ import types
 from typing import Any, Iterable, Optional, Type, get_origin, get_args, Annotated, Union
 
 
+def unwrap_annotated(annotation: Any) -> Any:
+    """Unwrap Annotated[T, ...] to T."""
+    origin = get_origin(annotation)
+    args = get_args(annotation)
+    if origin is Annotated and args:
+        return args[0]
+    return annotation
+
+
+def unwrap_annotated_optional(annotation: Any) -> Any:
+    """Unwrap Annotated and Optional/None unions to the non-None annotation.
+
+    If a union contains multiple non-None types, the original unwrapped annotation is
+    returned because there is no single semantic type to refine.
+    """
+    annotation = unwrap_annotated(annotation)
+    origin = get_origin(annotation)
+    args = get_args(annotation)
+    if origin in (Union, types.UnionType):
+        non_none_args = [arg for arg in args if arg is not type(None)]
+        if len(non_none_args) == 1:
+            return unwrap_annotated(non_none_args[0])
+    return annotation
+
+
 def is_optional_type(field_type: Any) -> bool:
     """Check if a type is optional (can be None).
 

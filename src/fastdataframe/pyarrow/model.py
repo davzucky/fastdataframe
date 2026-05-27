@@ -1,121 +1,76 @@
-"""PyArrowFastDataframeModel implementation."""
+"""PyArrow integration for FastDataFrame."""
+
+from __future__ import annotations
+
+from typing import cast as typing_cast
 
 import pyarrow as pa
+from pydantic import BaseModel, create_model
 
 from fastdataframe.core.model import AliasType, FastDataframeModel
-from fastdataframe.core.pydantic.field_info import (
-    get_serialization_alias,
-    get_validation_alias,
-)
-from fastdataframe.core.types_helper import is_optional_type
-from fastdataframe.pyarrow._types import get_pyarrow_type
+from fastdataframe.pyarrow._types import get_pyarrow_type_from_column
+
+
+def _column_name(column, alias_type: AliasType = "serialization") -> str:
+    if alias_type == "validation":
+        return column.validation_name
+    return column.storage_name
+
+
+def schema(
+    model: type[FastDataframeModel], alias_type: AliasType = "serialization"
+) -> pa.Schema:
+    """Get the PyArrow schema for a FastDataFrame model."""
+    fields = [
+        pa.field(
+            _column_name(column, alias_type),
+            get_pyarrow_type_from_column(column, alias_type),
+            nullable=column.nullable,
+        )
+        for column in model.column_definitions
+    ]
+    return pa.schema(fields)
+
+
+def string_schema(
+    model: type[FastDataframeModel], alias_type: AliasType = "serialization"
+) -> pa.Schema:
+    """Get the PyArrow schema for the model with all columns as strings."""
+    fields = [
+        pa.field(
+            _column_name(column, alias_type), pa.string(), nullable=column.nullable
+        )
+        for column in model.column_definitions
+    ]
+    return pa.schema(fields)
 
 
 class PyArrowFastDataframeModel(FastDataframeModel):
     """A model that extends FastDataframeModel for PyArrow integration."""
 
     @classmethod
-    def get_pyarrow_schema(cls, alias_type: AliasType = "serialization") -> pa.Schema:
-        """Get the PyArrow schema for the model.
-
-        This method generates a PyArrow schema based on the model's field definitions,
-        including proper type mappings and nullability information. The schema can be
-        used for creating Arrow tables, reading/writing Parquet files, and integrating
-        with other Arrow-based systems.
-
-        Args:
-            alias_type: The alias type to use for field names.
-                - 'serialization' (default): Use serialization aliases for field names
-                - 'validation': Use validation aliases for field names
-
-        Returns:
-            pa.Schema: A PyArrow Schema object representing the model's structure.
-
-        Example:
-            ```python
-            from fastdataframe.pyarrow.model import PyArrowFastDataframeModel
-            from typing import Optional
-
-            class UserModel(PyArrowFastDataframeModel):
-                id: int
-                name: str
-                email: Optional[str] = None
-                is_active: bool
-
-            # Get the schema
-            schema = UserModel.get_pyarrow_schema()
-
-            # Use with PyArrow
-            import pyarrow as pa
-            table = pa.table({
-                "id": [1, 2, 3],
-                "name": ["Alice", "Bob", "Charlie"],
-                "email": ["alice@example.com", None, "charlie@example.com"],
-                "is_active": [True, True, False]
-            }, schema=schema)
-            ```
-
-        Notes:
-            - Required fields (non-Optional) have nullable=False in the schema
-            - Optional fields have nullable=True in the schema
-            - Collection types (list, set, tuple) are mapped to pa.list_()
-            - Pydantic BaseModel fields are mapped to pa.struct()
-            - The schema preserves field order as defined in the model
-        """
-        alias_func = (
-            get_serialization_alias
-            if alias_type == "serialization"
-            else get_validation_alias
+    def from_base_model(cls, model: type[BaseModel]):
+        """Create a PyArrow-compatible model from a Pydantic model."""
+        field_definitions = {
+            field_name: (field_type.annotation, field_type)
+            for field_name, field_type in model.model_fields.items()
+        }
+        new_model = create_model(  # type: ignore[no-matching-overload]
+            f"{model.__name__}PyArrow",
+            __base__=cls,
+            __doc__=f"PyArrow version of {model.__name__}",
+            **field_definitions,
         )
+        return typing_cast(type[PyArrowFastDataframeModel], new_model)
 
-        fields = []
-        for field_name, field_info in cls.model_fields.items():
-            field_alias = alias_func(field_info, field_name)
-            pa_type = get_pyarrow_type(field_info, alias_type)
-            nullable = is_optional_type(field_info.annotation)
-            fields.append(pa.field(field_alias, pa_type, nullable=nullable))
-
-        return pa.schema(fields)
+    @classmethod
+    def get_pyarrow_schema(cls, alias_type: AliasType = "serialization") -> pa.Schema:
+        """Get the PyArrow schema for the model."""
+        return schema(cls, alias_type)
 
     @classmethod
     def get_stringified_schema(
         cls, alias_type: AliasType = "serialization"
     ) -> pa.Schema:
-        """Get the PyArrow schema for the model with all columns as strings.
-
-        This is useful when reading data from sources where all values are strings
-        (like CSV files) and need to be cast to the proper types later.
-
-        Args:
-            alias_type: The alias type to use for field names.
-                - 'serialization' (default): Use serialization aliases for field names
-                - 'validation': Use validation aliases for field names
-
-        Returns:
-            pa.Schema: A PyArrow Schema with all fields as pa.string() type.
-
-        Example:
-            ```python
-            class UserModel(PyArrowFastDataframeModel):
-                id: int
-                name: str
-                score: float
-
-            # Get stringified schema for reading CSV
-            string_schema = UserModel.get_stringified_schema()
-            # All fields will be pa.string()
-            ```
-        """
-        alias_func = (
-            get_serialization_alias
-            if alias_type == "serialization"
-            else get_validation_alias
-        )
-
-        fields = []
-        for field_name, field_info in cls.model_fields.items():
-            field_alias = alias_func(field_info, field_name)
-            nullable = is_optional_type(field_info.annotation)
-            fields.append(pa.field(field_alias, pa.string(), nullable=nullable))
-
-        return pa.schema(fields)
+        """Get the PyArrow schema for the model with all columns as strings."""
+        return string_schema(cls, alias_type)

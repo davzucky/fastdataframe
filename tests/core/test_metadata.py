@@ -2,7 +2,7 @@
 
 import dataclasses
 import pytest
-from fastdataframe import ColumnInfo
+from fastdataframe import ColumnInfo, Int32
 
 
 class TestColumnInfo:
@@ -33,25 +33,23 @@ class TestColumnInfo:
         doc = extra["_fastdataframe"]
         assert doc["type"] == "FastDataframe"
         assert doc["version"] == "1.0"
-        assert doc["properties"] == {"is_unique": True}
+        assert doc["properties"]["is_unique"] is True
+        assert doc["properties"]["deprecated"] is False
 
     def test_fastdataframe_from_schema(self) -> None:
         """Test that FastDataframe can be reconstructed from schema."""
-        # Create a schema with FastDataframe metadata
-        schema = {
-            "json_schema_extra": {
-                "is_unique": True,
-                "_fastdataframe": {
-                    "type": "FastDataframe",
-                    "version": "1.0",
-                    "properties": {"is_unique": True},
-                },
-            }
-        }
+        metadata = ColumnInfo(
+            is_unique=True,
+            bool_true_string="yes",
+            bool_false_string="no",
+            dtype=Int32(),
+            deprecated=True,
+            iceberg_id=7,
+        )
+        schema = {"json_schema_extra": metadata.as_field_metadata()}
 
-        # Reconstruct FastDataframe from schema
-        metadata = ColumnInfo.from_schema(schema)
-        assert metadata.is_unique is True
+        reconstructed = ColumnInfo.from_schema(schema)
+        assert reconstructed == metadata
 
     def test_fastdataframe_from_schema_invalid_type(self) -> None:
         """Test that FastDataframe.from_schema raises error for invalid type."""
